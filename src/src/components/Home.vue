@@ -1,4 +1,3 @@
-<!-- src/views/Home.vue -->
 <script setup lang="ts">
 import BookingForm from '../components/BookingForm.vue';
 </script>

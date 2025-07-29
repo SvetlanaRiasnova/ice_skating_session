@@ -1,24 +1,44 @@
-// src/services/apiService.ts
 import { fetchApi } from '../utils/fetchHelper';
 
-export async function getSessions(filterType?: string) {
-  const url = 'sessions/';
-  const params = {};
-  
-  if (filterType) {
-    params['filter_type'] = filterType;
-  }
+type FilterType = 'nearest' | 'weekend' | 'custom';
 
-return fetchApi(url, { method: 'GET', params});}
+export async function getSessions(filterType: FilterType, customDate?: string) {
+  const params: Record<string, string> = {};
+  
+  if (filterType === 'custom') {
+    if (!customDate) throw new Error('Custom date is required');
+    params.filter_type = 'custom';
+    params.custom_date = customDate;
+  } else {
+    params.filter_type = filterType;
+  }
+  
+  return fetchApi('api/v1/sessions/', { 
+    method: 'GET',
+    params 
+  });
+}
 
 export async function getSessionDetails(sessionId: number) {
-  return fetchApi(`sessions/${sessionId}/`, { method: 'GET' });
+  return fetchApi(`api/v1/sessions/${sessionId}/`, { method: 'GET' });
 }
 
 export async function getOrderPrice(payload: any) {
-  return fetchApi('/orders/get_price/', { method: 'POST', body: payload });
+  return fetchApi('api/v1/orders/get_price/', { 
+    method: 'POST', 
+    body: payload 
+  });
 }
 
 export async function createOrder(payload: any) {
-  return fetchApi('orders/', { method: 'POST', body: payload });
+  return fetchApi('api/v1/orders/', { 
+    method: 'POST', 
+    body: payload 
+  });
+}
+
+export async function checkOrderStatus(uuid: string) {
+  return fetchApi(`api/v1/orders/check_status/?uuid=${uuid}`, { 
+    method: 'GET' 
+  });
 }
