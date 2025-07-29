@@ -1,4 +1,3 @@
-// src/utils/fetchHelper.ts
 export async function fetchApi(url: string, options: RequestInit) {
     const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
     const fullUrl = `${baseUrl}${url}`;

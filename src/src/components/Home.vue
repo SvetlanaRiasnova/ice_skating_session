@@ -1,12 +1,10 @@
 <!-- src/views/Home.vue -->
 <script setup lang="ts">
-import SessionsFilter from '../components/SessionFilter.vue';
 import BookingForm from '../components/BookingForm.vue';
 </script>
 
 <template>
   <main class="container">
-    <SessionsFilter />
     <BookingForm />
   </main>
 </template>
@@ -20,5 +18,7 @@ import BookingForm from '../components/BookingForm.vue';
   display: flex;
   flex-direction: column;
   justify-content: center;
+  border: 2px solid #064594;
+  border-radius: 25px;
 }
 </style>
