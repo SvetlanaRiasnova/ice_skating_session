@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import Home from './components/Home.vue';
-
+import BookingForm from './components/BookingForm.vue';
 </script>
 
 <template>
-  <div>
-    <Home></Home>
-  </div>
-
+  <main class="container">
+    <BookingForm />
+  </main>
 </template>
+
 
 <style scoped>
 

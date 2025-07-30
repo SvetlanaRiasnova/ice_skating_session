@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed,  onUnmounted } from 'vue';
+import { ref, computed, onUnmounted, watch } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus } from '../services/api';
 
 interface Session {
@@ -48,6 +48,7 @@ const needSkates = ref<boolean>(false);
 const skatesCount = ref<number>(0);
 const userName = ref<string>('');
 const phoneNumber = ref<string>('');
+const phoneError = ref<string>('');
 const promoCode = ref<string>('');
 const totalCost = ref<number>(0);
 const isReviewMode = ref<boolean>(false);
@@ -55,7 +56,72 @@ const isLoading = ref<boolean>(false);
 const errorMessage = ref<string>('');
 
 const paymentWindow = ref<Window | null>(null);
-const checkStatusInterval = ref<NodeJS.Timeout | null>(null);
+const checkStatusInterval = ref<number | null>(null);
+
+const validatePhone = (phone: string): boolean => {
+  const cleaned = phone.replace(/\D/g, '');
+  return cleaned.length === 11 && (cleaned[0] === '7' || cleaned[0] === '8');
+};
+
+const formatPhoneNumber = (value: string): string => {
+  let cleaned = value.replace(/\D/g, '');
+  
+  
+  if (cleaned.length > 0 && !['7', '8'].includes(cleaned[0])) {
+    cleaned = '7' + cleaned; 
+  }
+  
+  cleaned = cleaned.substring(0, 11);
+  
+  let formattedValue = '';
+  
+  if (cleaned.length > 0) {
+    formattedValue = `+${cleaned[0]} `;
+    
+    if (cleaned.length > 1) {
+      formattedValue += '(' + cleaned.substring(1, 4);
+    }
+    if (cleaned.length > 4) {
+      formattedValue += ') ' + cleaned.substring(4, 7);
+    }
+    if (cleaned.length > 7) {
+      formattedValue += '-' + cleaned.substring(7, 9);
+    }
+    if (cleaned.length > 9) {
+      formattedValue += '-' + cleaned.substring(9, 11);
+    }
+  }
+  
+  return formattedValue;
+};
+
+const handlePhoneInput = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  let value = input.value.replace(/\D/g, '');
+  
+  // Сохраняем первую цифру (7 или 8), остальные обрезаем до 10
+  if (value.length > 0) {
+    const firstDigit = value[0] === '8' ? '8' : '7';
+    value = firstDigit + value.substring(1, 11);
+  }
+  
+  phoneNumber.value = value;
+  input.value = formatPhoneNumber(value);
+};
+
+const handlePhoneBlur = () => {
+  if (!phoneNumber.value) {
+    phoneError.value = 'Поле обязательно для заполнения';
+    return;
+  }
+  
+  if (!validatePhone(phoneNumber.value)) {
+    phoneError.value = 'Введите корректный номер телефона (начинается с 7 или 8)';
+  } else {
+    phoneError.value = '';
+  }
+};
+
 
 const showPenguinsNeeds = computed(() => children.value > 0);
 const showPenguinsInput = computed(() => needPenguins.value);
@@ -66,18 +132,29 @@ const selectedTime = computed(() => {
   return selectedTimes.value.find(time => time.id === selectedTimeId.value);
 });
 
+watch(filterType, (newVal, oldVal) => {
+  sessions.value = [];
+  sessionId.value = null;
+  selectedTimes.value = [];
+  selectedTimeId.value = null;
+  
+  if (newVal !== 'custom') {
+    loadSessions();
+  }
+});
+
 async function loadSessions() {
   if (!filterType.value) return;
-  
+
   if (filterType.value === 'custom' && !customDate.value) {
     errorMessage.value = 'Пожалуйста, выберите дату';
     sessions.value = [];
     return;
   }
-  
+
   isLoading.value = true;
   errorMessage.value = '';
-  
+
   try {
     const res = await getSessions(filterType.value, customDate.value);
     sessions.value = res;
@@ -106,7 +183,7 @@ const getDateTimes = async (session: Session) => {
 
 const handleSubmit = async (event: Event) => {
   event.preventDefault();
-  
+
   if (!sessionId.value || !selectedTimeId.value) {
     errorMessage.value = 'Пожалуйста, выберите дату и время';
     return;
@@ -151,10 +228,10 @@ const completeOrder = async () => {
   try {
     paymentStatus.value = { loading: true, success: null, order: null };
     const response = await createOrder(payload);
-    
+
     paymentWindow.value = window.open(response.payment_url, '_blank');
     startPaymentStatusCheck(response.uuid);
-    
+
   } catch (error) {
     console.error('Ошибка создания заказа:', error);
     paymentStatus.value = { loading: false, success: false, order: null };
@@ -166,11 +243,11 @@ const startPaymentStatusCheck = (uuid: string) => {
   if (checkStatusInterval.value) {
     clearInterval(checkStatusInterval.value);
   }
-  
-  checkStatusInterval.value = setInterval(async () => {
+
+  checkStatusInterval.value = window.setInterval(async () => {
     try {
       const status = await checkOrderStatus(uuid);
-      
+
       if (status.success) {
         clearInterval(checkStatusInterval.value!);
         paymentStatus.value = {
@@ -178,7 +255,7 @@ const startPaymentStatusCheck = (uuid: string) => {
           success: true,
           order: status.order
         };
-        
+
         if (paymentWindow.value && !paymentWindow.value.closed) {
           paymentWindow.value.close();
         }
@@ -202,8 +279,9 @@ const cancelReview = () => {
 
 onUnmounted(() => {
   if (checkStatusInterval.value) {
-    clearInterval(checkStatusInterval.value);
-  }
+  window.clearInterval(checkStatusInterval.value);
+  checkStatusInterval.value = null;
+}
   if (paymentWindow.value && !paymentWindow.value.closed) {
     paymentWindow.value.close();
   }
@@ -212,12 +290,8 @@ onUnmounted(() => {
 
 <template>
   <div class="filter-container" v-if="!isReviewMode">
-    <select 
-      v-model="filterType" 
-      @change="filterType === 'custom' ? null : loadSessions()"
-      class="filter-select"
-    >
-      <option value="" disabled selected>Выберите дату</option>
+    <select v-model="filterType" @change="filterType === 'custom' ? null : loadSessions()" class="filter-select">
+      <option value="" disabled selected>Выберите дату и время</option>
       <option value="nearest">Ближайшие три дня</option>
       <option value="weekend">Ближайшие выходные</option>
       <option value="custom">Определённая дата</option>
@@ -225,45 +299,31 @@ onUnmounted(() => {
 
     <div v-if="showDatePicker" class="date-picker">
       <label>Выберите дату:</label>
-      <input 
-        type="date" 
-        v-model="customDate" 
-        @change="loadSessions"
-        :min="new Date().toISOString().split('T')[0]"
-      />
+      <input type="date" v-model="customDate" @change="loadSessions" :min="new Date().toISOString().split('T')[0]" />
     </div>
 
     <div v-if="isLoading" class="loading-message">Загрузка сеансов...</div>
     <div v-else-if="errorMessage" class="error-message">{{ errorMessage }}</div>
     <template v-else>
       <ul v-if="sessions.length > 0" class="session-list">
-        <li 
-          v-for="session in sessions" 
-          :key="session.id" 
-          @click="getDateTimes(session)"
-          class="session-item"
-          :class="{ 'selected': sessionId === session.id }"
-        >
+        <li v-for="session in sessions" :key="session.id" @click="getDateTimes(session)" class="session-item"
+          :class="{ 'selected': sessionId === session.id }">
           {{ session.date }}
-          
+
           <ul v-if="sessionId === session.id && selectedTimes.length" class="time-list">
-            <li 
-              v-for="time in selectedTimes" 
-              :key="time.id"
-              @click.stop="selectedTimeId = time.id"
-              class="time-item"
-              :class="{ 'selected-time': selectedTimeId === time.id }"
-            >
+            <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id" class="time-item"
+              :class="{ 'selected-time': selectedTimeId === time.id }">
               {{ time.start_time }} - {{ time.end_time }}
-              <div class="availability">
-                Мест: {{ time.available_places_count }}, 
-                Пингвинов: {{ time.available_penguin_count }}
+              <div class="availability" :class="{'selected': selectedTimeId === time.id}">
+                <p>Мест: {{ time.available_places_count }}</p>
+                <p>Пингвинов: {{ time.available_penguin_count }}</p>
+                
               </div>
             </li>
           </ul>
         </li>
       </ul>
-      
+
       <p v-else-if="filterType && !isLoading" class="no-sessions">
         {{ filterType === 'custom' ? 'На выбранную дату сеансов нет' : 'Расписания пока нет' }}
       </p>
@@ -282,7 +342,7 @@ onUnmounted(() => {
 
       <template v-else-if="paymentStatus.success === null">
         <h2>Предварительный просмотр заказа</h2>
-        
+
         <div v-if="sessionDetails && selectedTime">
           <div>Сеанс №{{ sessionDetails.id }}</div>
           <div>Дата: {{ sessionDetails.date }}</div>
@@ -292,7 +352,7 @@ onUnmounted(() => {
           <div>Пингвины: {{ penguinsCount }}</div>
           <div>Пар коньков: {{ skatesCount }}</div>
           <div>Имя заказчика: {{ userName }}</div>
-          <div>Телефон: {{ phoneNumber }}</div>
+          <div>Телефон: {{ formatPhoneNumber(phoneNumber) }}</div>
           <div>Промокод: {{ promoCode }}</div>
           <div>Общая сумма заказа: {{ totalCost }} ₽</div>
         </div>
@@ -310,7 +370,7 @@ onUnmounted(() => {
 
       <template v-else-if="paymentStatus.success">
         <h2>Заказ успешно оплачен!</h2>
-        
+
         <div class="order-success">
           <div>Номер заказа: {{ paymentStatus.order.id }}</div>
           <div>Пин-код: {{ paymentStatus.order.pin }}</div>
@@ -319,7 +379,7 @@ onUnmounted(() => {
           <div>Количество человек: {{ paymentStatus.order.people_count }}</div>
           <div>Стоимость: {{ paymentStatus.order.price }} ₽</div>
         </div>
-        
+
         <button type="button" @click="cancelReview">Вернуться к выбору сеанса</button>
       </template>
 
@@ -330,8 +390,8 @@ onUnmounted(() => {
       </template>
     </div>
 
-    <div v-else>
-      <div v-if="sessionDetails && selectedTime">
+    <div v-else >
+      <div v-if="sessionDetails && selectedTime" class="currentSession">
         <strong>Сеанс №{{ sessionDetails.id }}</strong><br>
         Дата и время: {{ sessionDetails.date }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
       </div>
@@ -346,7 +406,7 @@ onUnmounted(() => {
         <input type="number" v-model.number="children" min="0" required>
       </div>
 
-      <div class="form-group" v-if="showPenguinsNeeds"> 
+      <div class="form-group" v-if="showPenguinsNeeds">
         <label>
           <input type="checkbox" v-model="needPenguins">
           Требуется ли пингвин?
@@ -375,10 +435,18 @@ onUnmounted(() => {
         <input type="text" v-model="userName" required>
       </div>
 
-      <div class="form-group">
-        <label>Ваш телефон</label>
-        <input type="tel" v-model="phoneNumber" required>
-      </div>
+       <div class="form-group">
+    <label>Ваш телефон</label>
+    <input 
+      type="tel" 
+      :value="formatPhoneNumber(phoneNumber)"
+      @input="handlePhoneInput"
+      @blur="handlePhoneBlur"
+      placeholder="+7 (___) ___-__-__"
+      required
+    >
+    <div class="error-message" v-if="phoneError">{{ phoneError }}</div>
+  </div>
 
       <div class="form-group">
         <label>Промокод (необязательно)</label>
@@ -393,12 +461,19 @@ onUnmounted(() => {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
 
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
 .filter-container {
   font-family: 'Roboto', sans-serif;
   color: #064594;
   margin: 0 auto;
   padding: 20px 0;
   text-align: center;
+  max-width: 500px;
 }
 
 .filter-select {
@@ -409,14 +484,18 @@ onUnmounted(() => {
   color: #064594;
   margin-bottom: 20px;
   width: 100%;
-  max-width: 300px;
+  max-width: 500px;
+  background-color: #f5f9ff;
+  font-size: 1rem;
 }
 
 .session-list {
   list-style: none;
   padding: 0;
-  max-width: 500px;
   margin: 0 auto;
+  width: 100%;
+    max-width: 500px;
+
 }
 
 .session-item {
@@ -426,7 +505,7 @@ onUnmounted(() => {
   border: 1px solid #d0e0ff;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .session-item:hover {
@@ -434,48 +513,68 @@ onUnmounted(() => {
 }
 
 .time-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
   list-style: none;
-  padding-left: 20px;
+  padding-left: 0;
   margin-top: 8px;
 }
 
 .time-item {
   padding: 8px;
   margin: 4px 0;
-  background-color: #eef4ff;
+  background-color: #064594;
   border: 1px solid #c0d0ff;
   border-radius: 4px;
   cursor: pointer;
+  color: #ffffff;
+
+  p {
+    margin: 0;
+  }
 }
 
 .time-item:hover {
-  background-color: #d9e5ff;
+  background-color: #06459480;
 }
 
 .selected-time {
-  background-color: #c0d0ff;
+  background-color: #ffffff;
+  color: #064594;
   font-weight: 500;
 }
 
 .availability {
   font-size: 0.8em;
-  color: #555;
+  color: #ffffff;
   margin-top: 4px;
+  
+  &.selected {
+  color: #064594;
 }
-
+}
 .booking-form {
   font-family: 'Roboto', sans-serif;
   color: #064594;
-  max-width: 600px;
+  max-width: 500px;
   margin: 0 auto;
   padding: 20px;
-  background: #fff;
+  background: #f5f9ff;
+  border: 1px solid #c0d0ff;
   border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
 }
 
+.currentSession {
+  margin-bottom: 50px;
+}
 .form-group {
   margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 label {
@@ -487,17 +586,26 @@ label {
 input[type="number"],
 input[type="text"],
 input[type="tel"],
-input[type="date"] {
+input[type="date"],
+select {
   width: 100%;
   padding: 10px;
   border: 1px solid #ccc;
   border-radius: 4px;
   font-family: inherit;
   box-sizing: border-box;
+  max-width: 100%;
 }
 
 input[type="checkbox"] {
   margin-right: 8px;
+  width: auto;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
 }
 
 button {
@@ -509,9 +617,13 @@ button {
   cursor: pointer;
   font-family: inherit;
   font-weight: 500;
-  margin: 10px 0;
+  margin: 20px 0;
   width: 100%;
+  max-width: 300px;
   transition: background-color 0.2s;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 button:hover {
@@ -558,18 +670,30 @@ h2 {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .date-picker {
   margin: 15px 0;
+  width: 100%;
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .date-picker label {
   display: block;
   margin-bottom: 5px;
   text-align: left;
+}
+
+.date-picker input {
+  width: 100%;
 }
 
 .loading-message,
@@ -592,5 +716,79 @@ h2 {
 .no-sessions {
   color: #064594;
   font-style: italic;
+}
+
+/* Адаптивные стили */
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+  }
+  
+  .booking-form {
+    padding: 15px;
+  }
+  
+  .filter-select,
+  .date-picker {
+    max-width: 100%;
+  }
+  
+  button {
+    max-width: 100%;
+  }
+  
+  .session-list {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-group {
+    margin-bottom: 10px;
+  }
+  
+  input[type="number"],
+  input[type="text"],
+  input[type="tel"],
+  input[type="date"] {
+    padding: 8px;
+  }
+  
+  .time-item {
+    padding: 6px;
+    font-size: 0.9em;
+  }
+  
+  .availability {
+    font-size: 0.75em;
+  }
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.checkbox-container input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin-right: 10px;
+}
+
+.checkbox-container label {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+}
+
+.dynamic-content {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.form-group.dynamic {
+  margin-top: -1px;
+  border-top: 1px solid transparent;
+  transition: all 0.3s ease;
 }
 </style>
