@@ -132,7 +132,7 @@ const selectedTime = computed(() => {
   return selectedTimes.value.find(time => time.id === selectedTimeId.value);
 });
 
-watch(filterType, (newVal, oldVal) => {
+watch(filterType, (newVal) => {
   sessions.value = [];
   sessionId.value = null;
   selectedTimes.value = [];
