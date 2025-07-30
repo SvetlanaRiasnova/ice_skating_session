@@ -63,6 +63,22 @@ const validatePhone = (phone: string): boolean => {
   return cleaned.length === 11 && (cleaned[0] === '7' || cleaned[0] === '8');
 };
 
+const formatDate = (dateString: string): string => {
+  if (!dateString) return '';
+  
+  try {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}.${month}.${year}`;
+  } catch (e) {
+    console.error('Ошибка форматирования даты:', e);
+    return dateString; 
+  }
+};
+
 const formatPhoneNumber = (value: string): string => {
   let cleaned = value.replace(/\D/g, '');
   
@@ -314,7 +330,7 @@ onUnmounted(() => {
       <ul v-if="sessions.length > 0" class="session-list">
         <li v-for="session in sessions" :key="session.id" @click="getDateTimes(session)" class="session-item"
           :class="{ 'selected': sessionId === session.id }">
-          {{ session.date }}
+          {{ formatDate(session.date) }}
 
           <ul v-if="sessionId === session.id && selectedTimes.length" class="time-list">
             <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id" class="time-item"
@@ -351,7 +367,7 @@ onUnmounted(() => {
 
         <div v-if="sessionDetails && selectedTime">
           <div>Сеанс №{{ sessionDetails.id }}</div>
-          <div>Дата: {{ sessionDetails.date }}</div>
+          <div>Дата: {{ formatDate(sessionDetails.date) }}</div>
           <div>Время: {{ selectedTime.start_time }} - {{ selectedTime.end_time }}</div>
           <div>Взрослые: {{ adults }}</div>
           <div>Дети до 11 лет: {{ children }}</div>
@@ -380,7 +396,7 @@ onUnmounted(() => {
         <div class="order-success">
           <div>Номер заказа: {{ paymentStatus.order.id }}</div>
           <div>Пин-код: {{ paymentStatus.order.pin }}</div>
-          <div>Дата: {{ paymentStatus.order.date }}</div>
+          <div>Дата: {{ formatDate(paymentStatus.order.date) }}</div>
           <div>Время: {{ paymentStatus.order.time }}</div>
           <div>Количество человек: {{ paymentStatus.order.people_count }}</div>
           <div>Стоимость: {{ paymentStatus.order.price }} ₽</div>
@@ -398,9 +414,9 @@ onUnmounted(() => {
 
     <div v-else >
       <div v-if="sessionDetails && selectedTime" class="currentSession">
-        <strong>Сеанс №{{ sessionDetails.id }}</strong><br>
-        Дата и время: {{ sessionDetails.date }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
-      </div>
+  <strong>Сеанс №{{ sessionDetails.id }}</strong><br>
+  Дата и время: {{ formatDate(sessionDetails.date) }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
+</div>
 
       <div class="form-group">
         <label>Взрослые (от 11 лет и старше)</label>
