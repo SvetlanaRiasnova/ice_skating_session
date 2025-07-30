@@ -138,7 +138,7 @@ watch(filterType, (newVal) => {
   selectedTimes.value = [];
   selectedTimeId.value = null;
   
-  if (newVal !== 'custom') {
+  if (newVal && newVal !== 'custom') {
     loadSessions();
   }
 });
@@ -290,8 +290,8 @@ onUnmounted(() => {
 
 <template>
   <div class="filter-container" v-if="!isReviewMode">
-    <select v-model="filterType" @change="filterType === 'custom' ? null : loadSessions()" class="filter-select">
-      <option value="" disabled selected>Выберите дату и время</option>
+    <select v-model="filterType"  class="filter-select">
+      <option value="" disabled selected>Выберите дату и время сеанса</option>
       <option value="nearest">Ближайшие три дня</option>
       <option value="weekend">Ближайшие выходные</option>
       <option value="custom">Определённая дата</option>
