@@ -143,6 +143,12 @@ watch(filterType, (newVal) => {
   }
 });
 
+watch(customDate, (newVal) => {
+  if (filterType.value === 'custom' && newVal) {
+    loadSessions();
+  }
+});
+
 async function loadSessions() {
   if (!filterType.value) return;
 
