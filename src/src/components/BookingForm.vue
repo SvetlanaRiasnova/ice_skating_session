@@ -368,7 +368,7 @@ watch(customDate, (newVal) => {
     <form 
       class="booking-form" 
       @submit="handleSubmit" 
-      v-if="showForm || isReviewMode"
+      v-if="isTelegram || isReviewMode"
     >
       <template v-if="isReviewMode">
         <!-- Блок подтверждения заказа -->
