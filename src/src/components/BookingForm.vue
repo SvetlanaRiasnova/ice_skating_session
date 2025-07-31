@@ -1,4 +1,803 @@
 <script setup lang="ts">
+import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
+import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus } from '../services/api';
+
+// Типы
+interface Session {
+  id: number;
+  date: string;
+}
+
+interface SessionTime {
+  id: number;
+  start_time: string;
+  end_time: string;
+  available_places_count: number;
+  available_penguin_count: number;
+}
+
+interface SessionDetails {
+  id: number;
+  date: string;
+  times: SessionTime[];
+}
+
+type FilterType = '' | 'nearest' | 'weekend' | 'custom';
+
+// Состояния
+const isTelegram = ref(false);
+const paymentStatus = ref({
+  loading: false,
+  success: null as boolean | null,
+  order: null as any
+});
+
+const sessions = ref<Session[]>([]);
+const filterType = ref<FilterType>('');
+const customDate = ref('');
+const sessionId = ref<number | null>(null);
+const selectedTimes = ref<SessionTime[]>([]);
+const selectedTimeId = ref<number | null>(null);
+const sessionDetails = ref<SessionDetails | null>(null);
+const adults = ref(1);
+const children = ref(0);
+const needPenguins = ref(false);
+const penguinsCount = ref(0);
+const needSkates = ref(false);
+const skatesCount = ref(0);
+const userName = ref('');
+const phoneNumber = ref('');
+const phoneError = ref('');
+const promoCode = ref('');
+const totalCost = ref(0);
+const isReviewMode = ref(false);
+const isLoading = ref(false);
+const errorMessage = ref('');
+
+const paymentWindow = ref<Window | null>(null);
+const checkStatusInterval = ref<number | null>(null);
+
+// Проверка платформы при загрузке
+onMounted(() => {
+  isTelegram.value = window.Telegram?.WebApp?.initData !== undefined;
+});
+
+// Вычисляемые свойства
+const showPenguinsNeeds = computed(() => children.value > 0);
+const showPenguinsInput = computed(() => needPenguins.value);
+const showSkatesInput = computed(() => needSkates.value);
+const showDatePicker = computed(() => filterType.value === 'custom');
+const selectedTime = computed(() => {
+  return selectedTimes.value.find(time => time.id === selectedTimeId.value) || null;
+});
+const showForm = computed(() => isTelegram.value || (!isTelegram.value && selectedTimeId.value));
+
+// Методы
+const validatePhone = (phone: string): boolean => {
+  const cleaned = phone.replace(/\D/g, '');
+  return cleaned.length === 11 && (cleaned[0] === '7' || cleaned[0] === '8');
+};
+
+const formatDate = (dateString: string): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('ru-RU');
+};
+
+const formatPhoneNumber = (value: string): string => {
+  let cleaned = value.replace(/\D/g, '');
+  if (cleaned.length > 0 && !['7', '8'].includes(cleaned[0])) {
+    cleaned = '7' + cleaned;
+  }
+  cleaned = cleaned.substring(0, 11);
+  
+  const match = cleaned.match(/^(\d)(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
+  if (!match) return '';
+  
+  return `+${match[1]}${match[2] ? ` (${match[2]}` : ''}${match[3] ? `) ${match[3]}` : ''}${match[4] ? `-${match[4]}` : ''}${match[5] ? `-${match[5]}` : ''}`;
+};
+
+const handlePhoneInput = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  let value = input.value.replace(/\D/g, '');
+  if (value.length > 0) {
+    const firstDigit = value[0] === '8' ? '8' : '7';
+    value = firstDigit + value.substring(1, 11);
+  }
+  phoneNumber.value = value;
+  input.value = formatPhoneNumber(value);
+};
+
+const handlePhoneBlur = () => {
+  if (!phoneNumber.value) {
+    phoneError.value = 'Поле обязательно для заполнения';
+    return;
+  }
+  phoneError.value = validatePhone(phoneNumber.value) ? '' : 'Введите корректный номер телефона (начинается с 7 или 8)';
+};
+
+// Загрузка данных
+async function loadSessions() {
+  if (!filterType.value || (filterType.value === 'custom' && !customDate.value)) {
+    errorMessage.value = filterType.value === 'custom' ? 'Пожалуйста, выберите дату' : '';
+    sessions.value = [];
+    return;
+  }
+
+  isLoading.value = true;
+  errorMessage.value = '';
+
+  try {
+    sessions.value = await getSessions(filterType.value, customDate.value);
+  } catch (error) {
+    console.error('Ошибка загрузки сеансов:', error);
+    errorMessage.value = 'Не удалось загрузить сеансы. Попробуйте позже.';
+    sessions.value = [];
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+const getDateTimes = async (session: Session) => {
+  sessionId.value = session.id;
+  try {
+    const details = await getSessionDetails(session.id);
+    sessionDetails.value = details;
+    selectedTimes.value = details.times;
+    selectedTimeId.value = isTelegram.value ? null : details.times[0]?.id || null;
+  } catch (error) {
+    console.error('Ошибка загрузки времени сеансов:', error);
+    errorMessage.value = 'Не удалось загрузить доступное время';
+    selectedTimes.value = [];
+  }
+};
+
+// Обработка заказа
+const handleSubmit = async (event: Event) => {
+  event.preventDefault();
+
+  if (!sessionId.value || (isTelegram.value && !selectedTimeId.value)) {
+    errorMessage.value = 'Пожалуйста, выберите дату и время';
+    return;
+  }
+
+  try {
+    const priceResult = await getOrderPrice({
+      session: sessionId.value,
+      session_time: selectedTimeId.value,
+      adult_count: adults.value,
+      child_count: children.value,
+      penguin_count: penguinsCount.value,
+      skates_count: skatesCount.value,
+      user_name: userName.value,
+      user_phone: phoneNumber.value,
+      promo_code: promoCode.value
+    });
+    
+    totalCost.value = priceResult.price;
+    isReviewMode.value = true;
+    paymentStatus.value = { loading: false, success: null, order: null };
+  } catch (error) {
+    console.error('Ошибка расчета стоимости:', error);
+    errorMessage.value = 'Ошибка при расчете стоимости';
+  }
+};
+
+const completeOrder = async () => {
+  if (!sessionId.value || !selectedTimeId.value) return;
+
+  try {
+    paymentStatus.value = { loading: true, success: null, order: null };
+    const response = await createOrder({
+      session: sessionId.value,
+      adult_count: adults.value,
+      child_count: children.value,
+      penguin_count: penguinsCount.value,
+      skates_count: skatesCount.value,
+      time: selectedTimeId.value,
+      user_name: userName.value,
+      user_phone: phoneNumber.value
+    });
+
+    if (isTelegram.value && window.Telegram?.WebApp) {
+      window.Telegram.WebApp.openInvoice(response.payment_url, (status: string) => {
+        if (status === 'paid') {
+          paymentStatus.value = { loading: false, success: true, order: response };
+        } else {
+          paymentStatus.value = { loading: false, success: false, order: null };
+        }
+      });
+    } else {
+      paymentWindow.value = window.open(response.payment_url, '_blank');
+      startPaymentStatusCheck(response.uuid);
+    }
+  } catch (error) {
+    console.error('Ошибка создания заказа:', error);
+    paymentStatus.value = { loading: false, success: false, order: null };
+    errorMessage.value = 'Ошибка при создании заказа';
+  }
+};
+
+const startPaymentStatusCheck = (uuid: string) => {
+  checkStatusInterval.value = window.setInterval(async () => {
+    try {
+      const status = await checkOrderStatus(uuid);
+      if (status.success) {
+        clearInterval(checkStatusInterval.value!);
+        paymentStatus.value = { loading: false, success: true, order: status.order };
+        paymentWindow.value?.close();
+      }
+    } catch (error) {
+      console.error('Ошибка проверки статуса:', error);
+      clearInterval(checkStatusInterval.value!);
+      paymentStatus.value = { loading: false, success: false, order: null };
+    }
+  }, 5000);
+};
+
+const resetPaymentStatus = () => {
+  paymentStatus.value = { loading: false, success: null, order: null };
+};
+
+const cancelReview = () => {
+  isReviewMode.value = false;
+  resetPaymentStatus();
+};
+
+// Очистка
+onUnmounted(() => {
+  if (checkStatusInterval.value) {
+    clearInterval(checkStatusInterval.value);
+  }
+  paymentWindow.value?.close();
+});
+
+// Наблюдатели
+watch(filterType, (newVal) => {
+  sessions.value = [];
+  sessionId.value = null;
+  selectedTimes.value = [];
+  selectedTimeId.value = null;
+  if (newVal && newVal !== 'custom') loadSessions();
+});
+
+watch(customDate, (newVal) => {
+  if (filterType.value === 'custom' && newVal) loadSessions();
+});
+</script>
+
+<template>
+  <div class="booking-container" :class="{ 'telegram': isTelegram }">
+    <!-- Блок фильтрации сеансов -->
+    <div class="filter-container" v-if="!isReviewMode">
+      <select v-model="filterType" class="filter-select">
+        <option value="" disabled selected>Выберите дату и время сеанса</option>
+        <option value="nearest">Ближайшие три дня</option>
+        <option value="weekend">Ближайшие выходные</option>
+        <option value="custom">Определённая дата</option>
+      </select>
+
+      <div v-if="showDatePicker" class="date-picker">
+        <label>Выберите дату:</label>
+        <input 
+          type="date" 
+          v-model="customDate" 
+          :min="new Date().toISOString().split('T')[0]" 
+          :disabled="isLoading"
+        />
+      </div>
+
+      <div v-if="isLoading" class="loading-message">Загрузка сеансов...</div>
+      <div v-else-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+      
+      <template v-else>
+        <ul v-if="sessions.length > 0" class="session-list">
+          <li 
+            v-for="session in sessions" 
+            :key="session.id" 
+            @click="isTelegram && getDateTimes(session)" 
+            class="session-item"
+            :class="{ 'selected': sessionId === session.id }"
+          >
+            {{ formatDate(session.date) }}
+
+            <ul 
+              v-if="sessionId === session.id && selectedTimes.length" 
+              class="time-list"
+              :class="{ 'interactive': isTelegram }"
+            >
+              <li 
+                v-for="time in selectedTimes" 
+                :key="time.id" 
+                @click.stop="isTelegram && (selectedTimeId = time.id)" 
+                class="time-item"
+                :class="{ 
+                  'selected-time': selectedTimeId === time.id,
+                  'clickable': isTelegram
+                }"
+              >
+                {{ time.start_time }} - {{ time.end_time }}
+                <div class="availability" :class="{ 'selected': selectedTimeId === time.id }">
+                  <p>Мест: {{ time.available_places_count }}</p>
+                  <p v-if="time.available_penguin_count !== undefined">
+                    Пингвинов: {{ time.available_penguin_count }}
+                  </p>
+                </div>
+              </li>
+            </ul>
+          </li>
+        </ul>
+
+        <p v-else-if="filterType && !isLoading" class="no-sessions">
+          {{ filterType === 'custom' ? 'На выбранную дату сеансов нет' : 'Расписания пока нет' }}
+        </p>
+      </template>
+    </div>
+
+    <!-- Форма бронирования -->
+    <form 
+      class="booking-form" 
+      @submit="handleSubmit" 
+      v-if="showForm || isReviewMode"
+    >
+      <template v-if="isReviewMode">
+        <!-- Блок подтверждения заказа -->
+        <div v-if="paymentStatus.loading" class="payment-loading">
+          <h2>Проверка оплаты...</h2>
+          <div class="spinner"></div>
+          <p>Пожалуйста, подождите, пока мы проверяем статус вашего платежа</p>
+        </div>
+
+        <template v-else-if="paymentStatus.success === null">
+          <h2>Предварительный просмотр заказа</h2>
+          <div v-if="sessionDetails && selectedTime" class="order-summary">
+            <div><strong>Сеанс №{{ sessionDetails.id }}</strong></div>
+            <div>Дата: {{ formatDate(sessionDetails.date) }}</div>
+            <div>Время: {{ selectedTime.start_time }} - {{ selectedTime.end_time }}</div>
+            <div>Взрослые: {{ adults }}</div>
+            <div>Дети: {{ children }}</div>
+            <div v-if="penguinsCount > 0">Пингвины: {{ penguinsCount }}</div>
+            <div v-if="skatesCount > 0">Коньки: {{ skatesCount }} пар</div>
+            <div>Имя: {{ userName }}</div>
+            <div>Телефон: {{ formatPhoneNumber(phoneNumber) }}</div>
+            <div v-if="promoCode">Промокод: {{ promoCode }}</div>
+            <div class="total-cost">Итого: {{ totalCost }} ₽</div>
+          </div>
+
+          <div class="payment-rules">
+            <h3>Правила оплаты:</h3>
+            <ol>
+              <li>Оплата производится онлайн банковской картой.</li>
+              <li>При отмене бронирования возврат средств возможен только в течение суток.</li>
+              <li>Указанные контактные данные необходимы для связи с вами.</li>
+            </ol>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" @click="completeOrder" class="primary">
+              Оплатить заказ
+            </button>
+            <button type="button" @click="cancelReview" class="secondary">
+              Назад
+            </button>
+          </div>
+        </template>
+
+        <template v-else-if="paymentStatus.success">
+          <h2>Заказ успешно оплачен!</h2>
+          <div class="order-success">
+            <div><strong>Номер заказа:</strong> {{ paymentStatus.order.id }}</div>
+            <div><strong>Пин-код:</strong> {{ paymentStatus.order.pin }}</div>
+            <div><strong>Дата:</strong> {{ formatDate(paymentStatus.order.date) }}</div>
+            <div><strong>Время:</strong> {{ paymentStatus.order.time }}</div>
+            <div><strong>Количество человек:</strong> {{ paymentStatus.order.people_count }}</div>
+            <div><strong>Стоимость:</strong> {{ paymentStatus.order.price }} ₽</div>
+          </div>
+          <button type="button" @click="cancelReview" class="primary">
+            Вернуться к выбору сеанса
+          </button>
+        </template>
+
+        <template v-else>
+          <h2>Ошибка оплаты</h2>
+          <p>Произошла ошибка при обработке платежа. Пожалуйста, попробуйте еще раз.</p>
+          <button type="button" @click="resetPaymentStatus" class="primary">
+            Попробовать снова
+          </button>
+        </template>
+      </template>
+
+      <template v-else>
+        <!-- Основная форма -->
+        <div v-if="sessionDetails && selectedTime" class="current-session">
+          <strong>Сеанс №{{ sessionDetails.id }}</strong><br>
+          Дата и время: {{ formatDate(sessionDetails.date) }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
+        </div>
+
+        <div class="form-group">
+          <label>Взрослые (от 11 лет и старше)</label>
+          <input type="number" v-model.number="adults" min="1" required>
+        </div>
+
+        <div class="form-group">
+          <label>Дети до 11 лет</label>
+          <input type="number" v-model.number="children" min="0" required>
+        </div>
+
+        <div class="form-group" v-if="showPenguinsNeeds">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="needPenguins">
+            <span>Требуется ли пингвин?</span>
+          </label>
+        </div>
+
+        <div class="form-group" v-if="showPenguinsInput">
+          <label>Необходимое количество пингвинов</label>
+          <input 
+            type="number" 
+            v-model.number="penguinsCount" 
+            min="0" 
+            :max="children" 
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="needSkates">
+            <span>Аренда коньков?</span>
+          </label>
+        </div>
+
+        <div class="form-group" v-if="showSkatesInput">
+          <label>Необходимое количество пар коньков</label>
+          <input type="number" v-model.number="skatesCount" min="0" required>
+        </div>
+
+        <div class="form-group">
+          <label>Ваше имя</label>
+          <input type="text" v-model="userName" required>
+        </div>
+
+        <div class="form-group">
+          <label>Ваш телефон</label>
+          <input 
+            type="tel" 
+            :value="formatPhoneNumber(phoneNumber)"
+            @input="handlePhoneInput"
+            @blur="handlePhoneBlur"
+            placeholder="+7 (___) ___-__-__"
+            required
+          >
+          <div class="error-message" v-if="phoneError">{{ phoneError }}</div>
+        </div>
+
+        <div class="form-group">
+          <label>Промокод (необязательно)</label>
+          <input type="text" v-model="promoCode">
+        </div>
+
+        <button type="submit" class="primary">
+          Оформить заказ
+        </button>
+      </template>
+    </form>
+  </div>
+</template>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
+
+.booking-container {
+  font-family: 'Roboto', sans-serif;
+  color: #064594;
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.booking-container.telegram {
+  max-width: 100%;
+  padding: 15px;
+}
+
+/* Стили фильтра */
+.filter-container {
+  margin-bottom: 20px;
+}
+
+.filter-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #064594;
+  border-radius: 4px;
+  background-color: #f5f9ff;
+  font-size: 1rem;
+  margin-bottom: 15px;
+}
+
+.date-picker {
+  margin: 15px 0;
+}
+
+.date-picker label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.date-picker input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.session-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.session-item {
+  padding: 12px;
+  margin-bottom: 10px;
+  background-color: #f5f9ff;
+  border: 1px solid #d0e0ff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.session-item:hover {
+  background-color: #e0ecff;
+}
+
+.time-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.time-item {
+  padding: 8px 12px;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #333;
+}
+
+.time-list.interactive .time-item {
+  cursor: pointer;
+  background-color: #064594;
+  color: white;
+}
+
+.time-list.interactive .time-item:hover {
+  background-color: #043a7a;
+}
+
+.time-item.selected-time {
+  background-color: white;
+  color: #064594;
+  border: 2px solid #064594;
+  font-weight: 500;
+}
+
+.availability {
+  font-size: 0.8em;
+  margin-top: 5px;
+  color: #666;
+}
+
+.time-list.interactive .availability,
+.time-item.selected-time .availability {
+  color: white;
+}
+
+.time-item.selected-time .availability {
+  color: #064594;
+}
+
+/* Стили формы */
+.booking-form {
+  background-color: #f5f9ff;
+  border: 1px solid #d0e0ff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.booking-container.telegram .booking-form {
+  padding: 15px;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+
+.current-session {
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #d0e0ff;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+input[type="number"],
+input[type="text"],
+input[type="tel"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  margin-right: 8px;
+}
+
+.error-message {
+  color: #d32f2f;
+  font-size: 0.8em;
+  margin-top: 5px;
+}
+
+/* Кнопки */
+button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 25px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+button.primary {
+  background-color: #064594;
+  color: white;
+  margin-top: 20px;
+}
+
+button.primary:hover {
+  background-color: #043a7a;
+}
+
+button.secondary {
+  background-color: #f0f0f0;
+  color: #064594;
+  margin-top: 10px;
+}
+
+button.secondary:hover {
+  background-color: #e0e0e0;
+}
+
+.form-actions {
+  margin-top: 20px;
+}
+
+/* Блоки информации */
+.order-summary {
+  margin-bottom: 20px;
+}
+
+.order-summary div {
+  margin-bottom: 8px;
+}
+
+.total-cost {
+  font-weight: bold;
+  margin-top: 10px;
+  font-size: 1.1em;
+}
+
+.payment-rules {
+  margin: 20px 0;
+}
+
+.payment-rules ol {
+  padding-left: 20px;
+  margin-top: 10px;
+}
+
+.order-success {
+  margin: 20px 0;
+}
+
+.order-success div {
+  margin-bottom: 10px;
+}
+
+/* Сообщения */
+.loading-message,
+.error-message,
+.no-sessions {
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+}
+
+.loading-message {
+  color: #064594;
+  background-color: #f5f9ff;
+}
+
+.error-message {
+  color: #d32f2f;
+  background-color: #ffebee;
+}
+
+.no-sessions {
+  color: #064594;
+  font-style: italic;
+}
+
+/* Анимация загрузки */
+.payment-loading {
+  text-align: center;
+  padding: 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin: 20px auto;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #064594;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Адаптация для мобильных */
+@media (max-width: 480px) {
+  .booking-container {
+    padding: 15px;
+  }
+  
+  .session-item {
+    padding: 10px;
+  }
+  
+  .time-item {
+    padding: 8px;
+    font-size: 0.9em;
+  }
+  
+  .booking-form {
+    padding: 15px;
+  }
+  
+  input[type="number"],
+  input[type="text"],
+  input[type="tel"] {
+    padding: 8px;
+  }
+}
+</style>
+<!-- <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus } from '../services/api';
 
@@ -813,4 +1612,4 @@ h2 {
   border-top: 1px solid transparent;
   transition: all 0.3s ease;
 }
-</style>
+</style> -->
