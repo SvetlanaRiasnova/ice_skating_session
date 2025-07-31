@@ -64,7 +64,10 @@ const totalCost = ref(0);
 const isReviewMode = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
-
+const agreement = ref(false);
+const privacyPolicy = ref(false);
+const nameError = ref('');
+const checkboxError = ref('');
 const paymentWindow = ref<Window | null>(null);
 const checkStatusInterval = ref<number | null>(null);
 
@@ -100,9 +103,28 @@ const showDatePicker = computed(() => filterType.value === 'custom');
 const selectedTime = computed(() => {
   return selectedTimes.value.find(time => time.id === selectedTimeId.value) || null;
 });
-const showForm = computed(() => isTelegram.value || (!isTelegram.value && selectedTimeId.value));
+// const showForm = computed(() => isTelegram.value || (!isTelegram.value && selectedTimeId.value));
+
 
 // Методы
+// Валидация имени
+const validateName = (name: string): boolean => {
+  if (!name.trim()) {
+    nameError.value = 'Поле обязательно для заполнения';
+    return false;
+  }
+  if (name.trim().length < 2) {
+    nameError.value = 'Имя должно содержать минимум 2 символа';
+    return false;
+  }
+  if (/\d/.test(name)) {
+    nameError.value = 'Имя не должно содержать цифры';
+    return false;
+  }
+  nameError.value = '';
+  return true;
+};
+
 const validatePhone = (phone: string): boolean => {
   const cleaned = phone.replace(/\D/g, '');
   return cleaned.length === 11 && (cleaned[0] === '7' || cleaned[0] === '8');
@@ -182,12 +204,32 @@ const getDateTimes = async (session: Session) => {
   }
 };
 
-// Обработка заказа
+// Обновленный handleSubmit с валидацией
 const handleSubmit = async (event: Event) => {
   event.preventDefault();
+  checkboxError.value = '';
+  errorMessage.value = '';
 
+  // Валидация выбора времени
   if (!sessionId.value || (isTelegram.value && !selectedTimeId.value)) {
     errorMessage.value = 'Пожалуйста, выберите дату и время';
+    return;
+  }
+
+  // Валидация имени
+  if (!validateName(userName.value)) {
+    return;
+  }
+
+  // Валидация телефона
+  if (!validatePhone(phoneNumber.value)) {
+    phoneError.value = 'Введите корректный номер телефона (начинается с 7 или 8)';
+    return;
+  }
+
+  // Валидация чекбоксов
+  if (!agreement.value || !privacyPolicy.value) {
+    checkboxError.value = 'Необходимо принять условия соглашения и политики конфиденциальности';
     return;
   }
 
@@ -368,7 +410,7 @@ watch(customDate, (newVal) => {
     <form 
       class="booking-form" 
       @submit="handleSubmit" 
-      v-if="isTelegram"
+    
     >
       <template v-if="isReviewMode">
         <!-- Блок подтверждения заказа -->
@@ -486,7 +528,8 @@ watch(customDate, (newVal) => {
 
         <div class="form-group">
           <label>Ваше имя</label>
-          <input type="text" v-model="userName" required>
+          <input type="text" v-model="userName" @blur="validateName(userName)" required>
+           <div class="error-message" v-if="nameError">{{ nameError }}</div>
         </div>
 
         <div class="form-group">
@@ -506,7 +549,29 @@ watch(customDate, (newVal) => {
           <label>Промокод (необязательно)</label>
           <input type="text" v-model="promoCode">
         </div>
+        <div class="form-group checkbox-group">
+        <label class="checkbox-label">
+          <input type="checkbox" v-model="agreement">
+          <span>Я согласен с обработкой персональных данных</span>
+        </label>
+      </div>
 
+      <div class="form-group checkbox-group">
+        <label class="checkbox-label">
+          <input type="checkbox" v-model="privacyPolicy">
+          <span>Я согласен с <a href="https://icemetr.ru/policy" target="_blank">политикой конфиденциальности</a></span>
+        </label>
+      </div>
+
+      <div class="error-message form-error" v-if="checkboxError">
+        {{ checkboxError }}
+      </div>
+
+      <div v-if="checkboxError && errorMessage" class="error-message form-error">
+        {{ errorMessage }}
+      </div>
+
+      <div v-if="errorMessage" class="error-message form-error">{{ errorMessage }}</div>
         <button type="submit" class="primary">
           Оформить заказ
         </button>
