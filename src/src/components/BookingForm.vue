@@ -74,8 +74,7 @@ const checkTelegramWebApp = (): boolean => {
     return (
       typeof window !== 'undefined' &&
       window.Telegram?.WebApp?.initData !== undefined &&
-      window.Telegram?.WebApp?.platform !== 'unknown' &&
-      !window.Telegram?.WebApp?.isIframe // Дополнительная проверка
+      window.Telegram?.WebApp?.platform !== 'unknown' 
     );
   } catch (e) {
     return false;
