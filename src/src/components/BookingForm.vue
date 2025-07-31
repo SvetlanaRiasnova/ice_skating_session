@@ -2,7 +2,19 @@
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus } from '../services/api';
 
-// Типы
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: {
+        initData?: string;
+        openInvoice?: (url: string, callback: (status: string) => void) => void;
+        version?: string;
+        platform?: string;
+        isExpanded?: boolean;      };
+    };
+  }
+}
+
 interface Session {
   id: number;
   date: string;
@@ -24,7 +36,6 @@ interface SessionDetails {
 
 type FilterType = '' | 'nearest' | 'weekend' | 'custom';
 
-// Состояния
 const isTelegram = ref(false);
 const paymentStatus = ref({
   loading: false,
@@ -57,10 +68,30 @@ const errorMessage = ref('');
 const paymentWindow = ref<Window | null>(null);
 const checkStatusInterval = ref<number | null>(null);
 
+
+const checkTelegramWebApp = (): boolean => {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      window.Telegram?.WebApp?.initData !== undefined &&
+      window.Telegram?.WebApp?.platform !== 'unknown' &&
+      !window.Telegram?.WebApp?.isIframe // Дополнительная проверка
+    );
+  } catch (e) {
+    return false;
+  }
+};
 // Проверка платформы при загрузке
 onMounted(() => {
-  isTelegram.value = window.Telegram?.WebApp?.initData !== undefined;
+  isTelegram.value = checkTelegramWebApp();
+  
+  // Для отладки
+  console.group('Platform Detection');
+  console.log('isTelegram:', isTelegram.value);
+  console.log('WebApp object:', window.Telegram?.WebApp);
+  console.groupEnd();
 });
+
 
 // Вычисляемые свойства
 const showPenguinsNeeds = computed(() => children.value > 0);
@@ -199,7 +230,7 @@ const completeOrder = async () => {
       user_phone: phoneNumber.value
     });
 
-    if (isTelegram.value && window.Telegram?.WebApp) {
+    if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
       window.Telegram.WebApp.openInvoice(response.payment_url, (status: string) => {
         if (status === 'paid') {
           paymentStatus.value = { loading: false, success: true, order: response };
@@ -295,7 +326,7 @@ watch(customDate, (newVal) => {
           <li 
             v-for="session in sessions" 
             :key="session.id" 
-            @click="isTelegram && getDateTimes(session)" 
+            @click="getDateTimes(session)" 
             class="session-item"
             :class="{ 'selected': sessionId === session.id }"
           >
@@ -485,6 +516,7 @@ watch(customDate, (newVal) => {
   </div>
 </template>
 
+
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
 
@@ -500,6 +532,7 @@ watch(customDate, (newVal) => {
   max-width: 100%;
   padding: 15px;
 }
+
 
 /* Стили фильтра */
 .filter-container {
