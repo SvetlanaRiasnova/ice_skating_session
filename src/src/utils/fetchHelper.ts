@@ -6,7 +6,7 @@ export async function fetchApi(
     params?: Record<string, string>;
   }
 ) {
-  https://8ta3nr-212-19-10-25.ru.tuna.am
+
   // const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   //временно для тестов
