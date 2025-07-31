@@ -1,4 +1,3 @@
-// src/utils/fetchHelper.ts
 export async function fetchApi(
   endpoint: string,
   options: {
@@ -7,13 +6,15 @@ export async function fetchApi(
     params?: Record<string, string>;
   }
 ) {
-  // Базовый URL можно задать через .env или напрямую
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  https://8ta3nr-212-19-10-25.ru.tuna.am
+  // const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
+  //временно для тестов
+  const baseUrl =   "https://8ta3nr-212-19-10-25.ru.tuna.am";
+
   
-  // Удаляем дублирующиеся слеши в URL
   let url = `${baseUrl}/${endpoint}`.replace(/([^:]\/)\/+/g, '$1');
   
-  // Добавляем параметры запроса
   if (options.params) {
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(options.params)) {
