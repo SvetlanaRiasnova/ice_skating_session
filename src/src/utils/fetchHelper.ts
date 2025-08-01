@@ -4,23 +4,22 @@ export async function fetchApi(
     method?: string;
     body?: any;
     params?: Record<string, string>;
-  }
+  } = {} // Добавляем значение по умолчанию - пустой объект
 ) {
-
-  // const baseUrl = import.meta.env.VITE_API_BASE_URL;
-
-  //временно для тестов
-  const baseUrl =   "https://8ta3nr-212-19-10-25.ru.tuna.am";
-
+  const baseUrl = "https://gegx68-212-19-10-25.ru.tuna.am";
   
   let url = `${baseUrl}/${endpoint}`.replace(/([^:]\/)\/+/g, '$1');
   
-  if (options.params) {
+  // Добавляем проверку на существование options.params
+  if (options?.params) {
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(options.params)) {
       if (value) queryParams.append(key, value);
     }
-    url += `?${queryParams.toString()}`;
+    const queryString = queryParams.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
   }
 
   const headers = {
@@ -28,11 +27,11 @@ export async function fetchApi(
   };
 
   const config: RequestInit = {
-    method: options.method || 'GET',
+    method: options?.method || 'GET', // Добавляем опциональную цепочку
     headers,
   };
 
-  if (options.body) {
+  if (options?.body) {
     config.body = JSON.stringify(options.body);
   }
 

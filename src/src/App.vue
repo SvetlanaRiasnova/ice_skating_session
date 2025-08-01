@@ -11,4 +11,7 @@ import BookingForm from './components/BookingForm.vue';
 
 <style scoped>
 
+  .container {
+    background-color: rgb(255, 255, 255);
+  }
 </style>

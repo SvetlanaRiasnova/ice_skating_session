@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
-import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus } from '../services/api';
+import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus,checkPromoCode } from '../services/api';
 
 declare global {
   interface Window {
@@ -10,7 +10,8 @@ declare global {
         openInvoice?: (url: string, callback: (status: string) => void) => void;
         version?: string;
         platform?: string;
-        isExpanded?: boolean;      };
+        isExpanded?: boolean;
+      };
     };
   }
 }
@@ -33,8 +34,18 @@ interface SessionDetails {
   date: string;
   times: SessionTime[];
 }
-
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string;
+    };
+  };
+}
 type FilterType = '' | 'nearest' | 'weekend' | 'custom';
+function isApiError(error: unknown): error is ApiError {
+  return typeof error === 'object' && error !== null && 'response' in error;
+}
 
 const isTelegram = ref(false);
 const paymentStatus = ref({
@@ -59,8 +70,16 @@ const skatesCount = ref(0);
 const userName = ref('');
 const phoneNumber = ref('');
 const phoneError = ref('');
-const promoCode = ref('') || null;
+const promoCode = ref('');
+const promoCodeInput = ref('');
+const promoCodeError = ref('');
+const promoCodeApplied = ref(false);
+const promoCodeDetails = ref<{
+  sum: number;
+  percentage_check: string;
+} | null>(null);
 const totalCost = ref(0);
+const originalCost = ref(0);
 const isReviewMode = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
@@ -70,7 +89,6 @@ const nameError = ref('');
 const checkboxError = ref('');
 const paymentWindow = ref<Window | null>(null);
 const checkStatusInterval = ref<number | null>(null);
-
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -83,19 +101,12 @@ const checkTelegramWebApp = (): boolean => {
     return false;
   }
 };
-// Проверка платформы при загрузке
+
 onMounted(() => {
   isTelegram.value = checkTelegramWebApp();
-  
-  // Для отладки
-  console.group('Platform Detection');
   console.log('isTelegram:', isTelegram.value);
-  console.log('WebApp object:', window.Telegram?.WebApp);
-  console.groupEnd();
 });
 
-
-// Вычисляемые свойства
 const showPenguinsNeeds = computed(() => children.value > 0);
 const showPenguinsInput = computed(() => needPenguins.value);
 const showSkatesInput = computed(() => needSkates.value);
@@ -103,11 +114,7 @@ const showDatePicker = computed(() => filterType.value === 'custom');
 const selectedTime = computed(() => {
   return selectedTimes.value.find(time => time.id === selectedTimeId.value) || null;
 });
-// const showForm = computed(() => isTelegram.value || (!isTelegram.value && selectedTimeId.value));
 
-
-// Методы
-// Валидация имени
 const validateName = (name: string): boolean => {
   if (!name.trim()) {
     nameError.value = 'Поле обязательно для заполнения';
@@ -168,7 +175,6 @@ const handlePhoneBlur = () => {
   phoneError.value = validatePhone(phoneNumber.value) ? '' : 'Введите корректный номер телефона (начинается с 7 или 8)';
 };
 
-// Загрузка данных
 async function loadSessions() {
   if (!filterType.value || (filterType.value === 'custom' && !customDate.value)) {
     errorMessage.value = filterType.value === 'custom' ? 'Пожалуйста, выберите дату' : '';
@@ -203,31 +209,116 @@ const getDateTimes = async (session: Session) => {
     selectedTimes.value = [];
   }
 };
+const applyPromoCode = async () => {
+  promoCodeError.value = '';
+  
+  if (!sessionId.value || !selectedTimeId.value) {
+    promoCodeError.value = 'Сначала выберите дату и время сеанса';
+    return;
+  }
 
-// Обновленный handleSubmit с валидацией
+  try {
+    const payload = {
+      session: sessionId.value,
+      session_time: selectedTimeId.value,
+      adult_count: adults.value,
+      child_count: children.value,
+      penguin_count: penguinsCount.value,
+      skates_count: skatesCount.value,
+      user_name: userName.value,
+      user_phone: phoneNumber.value,
+      promo_code: promoCodeInput.value.trim() || null,
+      promotions: []
+    };
+
+    if (promoCodeApplied.value && promoCodeInput.value === promoCode.value) {
+      payload.promo_code = null;
+    }
+
+    const priceResult = await getOrderPrice(payload);
+    
+    if (payload.promo_code) {
+      try {
+        const promoResponse = await checkPromoCode(promoCodeInput.value);
+        promoCodeDetails.value = {
+          sum: promoResponse.sum,
+          percentage_check: promoResponse.percentage_check
+        };
+        promoCodeApplied.value = true;
+        promoCode.value = promoCodeInput.value;
+      } catch (error) {
+        if (isApiError(error)) {
+          promoCodeError.value = error.response?.status === 404 
+            ? 'Промокод недействителен или уже был использован' 
+            : error.response?.data?.message || 'Ошибка при проверке промокода';
+        } else if (error instanceof Error) {
+          promoCodeError.value = error.message;
+        } else {
+          promoCodeError.value = 'Неизвестная ошибка при проверке промокода';
+        }
+        throw error;
+      }
+    } else {
+      promoCodeInput.value = '';
+      promoCode.value = '';
+      promoCodeApplied.value = false;
+      promoCodeDetails.value = null;
+    }
+    
+    totalCost.value = priceResult.price;
+    originalCost.value = priceResult.price;
+    
+  } catch (error) {
+    console.error('Ошибка:', error);
+    
+    if (isApiError(error)) {
+      promoCodeError.value = error.response?.status === 404
+        ? 'Промокод недействителен или уже был использован'
+        : error.response?.data?.message || 'Ошибка при расчете стоимости';
+    } else if (error instanceof Error) {
+      promoCodeError.value = error.message;
+    } else {
+      promoCodeError.value = 'Неизвестная ошибка';
+    }
+    
+    try {
+      const priceResult = await getOrderPrice({
+        session: sessionId.value,
+        session_time: selectedTimeId.value,
+        adult_count: adults.value,
+        child_count: children.value,
+        penguin_count: penguinsCount.value,
+        skates_count: skatesCount.value,
+        user_name: userName.value,
+        user_phone: phoneNumber.value,
+        promo_code: null,
+        promotions: []
+      });
+      totalCost.value = priceResult.price;
+    } catch (innerError) {
+      console.error('Ошибка расчета стоимости:', innerError);
+    }
+  }
+};
 const handleSubmit = async (event: Event) => {
   event.preventDefault();
   checkboxError.value = '';
   errorMessage.value = '';
 
-  // Валидация выбора времени
   if (!sessionId.value || (isTelegram.value && !selectedTimeId.value)) {
     errorMessage.value = 'Пожалуйста, выберите дату и время';
     return;
   }
 
-  // Валидация имени
   if (!validateName(userName.value)) {
     return;
   }
 
-  // Валидация телефона
   if (!validatePhone(phoneNumber.value)) {
     phoneError.value = 'Введите корректный номер телефона (начинается с 7 или 8)';
     return;
   }
 
-  // Валидация чекбоксов
   if (!agreement.value || !privacyPolicy.value) {
     checkboxError.value = 'Необходимо принять условия соглашения и политики конфиденциальности';
     return;
@@ -243,12 +334,16 @@ const handleSubmit = async (event: Event) => {
       skates_count: skatesCount.value,
       user_name: userName.value,
       user_phone: phoneNumber.value,
-      promo_code: promoCode.value
+      promo_code: null // Исправлено: передаем null вместо отсутствующего значения
     });
     
+    originalCost.value = priceResult.price;
     totalCost.value = priceResult.price;
     isReviewMode.value = true;
     paymentStatus.value = { loading: false, success: null, order: null };
+    promoCodeApplied.value = false;
+    promoCodeInput.value = '';
+    promoCode.value = '';
   } catch (error) {
     console.error('Ошибка расчета стоимости:', error);
     errorMessage.value = 'Ошибка при расчете стоимости';
@@ -260,7 +355,9 @@ const completeOrder = async () => {
 
   try {
     paymentStatus.value = { loading: true, success: null, order: null };
-    const response = await createOrder({
+    
+    // Prepare the payload
+    const payload: Record<string, any> = {
       session: sessionId.value,
       adult_count: adults.value,
       child_count: children.value,
@@ -268,8 +365,12 @@ const completeOrder = async () => {
       skates_count: skatesCount.value,
       time: selectedTimeId.value,
       user_name: userName.value,
-      user_phone: phoneNumber.value
-    });
+      user_phone: phoneNumber.value,
+      promo_code: promoCode.value ? promoCode.value : null, // Исправлено: передаем null если промокода нет
+      promotions: [] // Добавляем пустой массив promotions
+    };
+     console.log('Отправляемые данные:', payload);
+    const response = await createOrder(payload);
 
     if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
       window.Telegram.WebApp.openInvoice(response.payment_url, (status: string) => {
@@ -316,7 +417,6 @@ const cancelReview = () => {
   resetPaymentStatus();
 };
 
-// Очистка
 onUnmounted(() => {
   if (checkStatusInterval.value) {
     clearInterval(checkStatusInterval.value);
@@ -324,7 +424,6 @@ onUnmounted(() => {
   paymentWindow.value?.close();
 });
 
-// Наблюдатели
 watch(filterType, (newVal) => {
   sessions.value = [];
   sessionId.value = null;
@@ -381,15 +480,15 @@ watch(customDate, (newVal) => {
               <li 
                 v-for="time in selectedTimes" 
                 :key="time.id" 
-                @click.stop="isTelegram && (selectedTimeId = time.id)" 
+                @click.stop="selectedTimeId = time.id" 
                 class="time-item"
                 :class="{ 
-                  'selected-time': selectedTimeId === time.id,
+                  'selected-time': isTelegram && (selectedTimeId = time.id),
                   'clickable': isTelegram
                 }"
               >
                 {{ time.start_time }} - {{ time.end_time }}
-                <div class="availability" :class="{ 'selected': selectedTimeId === time.id }">
+                <div class="availability" :class="{ 'selected': isTelegram && (selectedTimeId = time.id) }">
                   <p>Мест: {{ time.available_places_count }}</p>
                   <p v-if="time.available_penguin_count !== undefined">
                     Пингвинов: {{ time.available_penguin_count }}
@@ -410,7 +509,6 @@ watch(customDate, (newVal) => {
     <form 
       class="booking-form" 
       @submit="handleSubmit" 
-    
     >
       <template v-if="isReviewMode">
         <!-- Блок подтверждения заказа -->
@@ -432,7 +530,40 @@ watch(customDate, (newVal) => {
             <div v-if="skatesCount > 0">Коньки: {{ skatesCount }} пар</div>
             <div>Имя: {{ userName }}</div>
             <div>Телефон: {{ formatPhoneNumber(phoneNumber) }}</div>
-            <div v-if="promoCode">Промокод: {{ promoCode }}</div>
+            <div><strong>Стоимость:</strong> {{ totalCost }} ₽</div>
+            <!-- Блок промокода -->
+             <div class="promo-code-section">
+    <div class="promo-code-header">
+      <h3>Применить промокод</h3>
+    </div>
+    
+    <div class="promo-code-input-group">
+      <input
+        type="text"
+        v-model="promoCodeInput"
+        placeholder="Введите промокод"
+        :disabled="promoCodeApplied"
+        class="promo-code-input"
+      >
+      <button
+        type="button"
+        @click="applyPromoCode"
+        class="promo-code-button"
+      >
+        {{ promoCodeApplied ? 'Сбросить' : 'Применить' }}
+      </button>
+    </div>
+    
+    <div v-if="promoCodeError" class="error-message promo-error">
+      {{ promoCodeError }}
+    </div>
+    
+    <div v-if="promoCodeDetails" class="promo-code-success">
+      Промокод применён! Скидка: {{ promoCodeDetails.sum }} ₽ 
+      (максимум {{ promoCodeDetails.percentage_check }}% от суммы заказа)
+    </div>
+  </div>
+            
             <div class="total-cost">Итого: {{ totalCost }} ₽</div>
           </div>
 
@@ -447,7 +578,7 @@ watch(customDate, (newVal) => {
 
           <div class="form-actions">
             <button type="button" @click="completeOrder" class="primary">
-              Оплатить заказ
+              Перейти к оплате
             </button>
             <button type="button" @click="cancelReview" class="secondary">
               Назад
@@ -529,7 +660,7 @@ watch(customDate, (newVal) => {
         <div class="form-group">
           <label>Ваше имя</label>
           <input type="text" v-model="userName" @blur="validateName(userName)" required>
-           <div class="error-message" v-if="nameError">{{ nameError }}</div>
+          <div class="error-message" v-if="nameError">{{ nameError }}</div>
         </div>
 
         <div class="form-group">
@@ -545,33 +676,29 @@ watch(customDate, (newVal) => {
           <div class="error-message" v-if="phoneError">{{ phoneError }}</div>
         </div>
 
-        <div class="form-group">
-          <label>Промокод (необязательно)</label>
-          <input type="text" v-model="promoCode">
-        </div>
         <div class="form-group checkbox-group">
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="agreement">
-          <span>Я согласен с обработкой персональных данных</span>
-        </label>
-      </div>
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="agreement">
+            <span>Я согласен с обработкой персональных данных</span>
+          </label>
+        </div>
 
-      <div class="form-group checkbox-group">
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="privacyPolicy">
-          <span>Я согласен с <a href="https://icemetr.ru/policy" target="_blank">политикой конфиденциальности</a></span>
-        </label>
-      </div>
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="privacyPolicy">
+            <span>Я согласен с <a href="https://icemetr.ru/policy" target="_blank">политикой конфиденциальности</a></span>
+          </label>
+        </div>
 
-      <div class="error-message form-error" v-if="checkboxError">
-        {{ checkboxError }}
-      </div>
+        <div class="error-message form-error" v-if="checkboxError">
+          {{ checkboxError }}
+        </div>
 
-      <div v-if="checkboxError && errorMessage" class="error-message form-error">
-        {{ errorMessage }}
-      </div>
+        <div v-if="checkboxError && errorMessage" class="error-message form-error">
+          {{ errorMessage }}
+        </div>
 
-      <div v-if="errorMessage" class="error-message form-error">{{ errorMessage }}</div>
+        <div v-if="errorMessage" class="error-message form-error">{{ errorMessage }}</div>
         <button type="submit" class="primary">
           Оформить заказ
         </button>
@@ -579,7 +706,6 @@ watch(customDate, (newVal) => {
     </form>
   </div>
 </template>
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
@@ -596,7 +722,6 @@ watch(customDate, (newVal) => {
   max-width: 100%;
   padding: 15px;
 }
-
 
 /* Стили фильтра */
 .filter-container {
@@ -624,9 +749,11 @@ watch(customDate, (newVal) => {
 
 .date-picker input {
   width: 100%;
-  padding: 8px;
+padding: 10px;
   border: 1px solid #ccc;
+
   border-radius: 4px;
+    box-sizing: border-box;
 }
 
 .session-list {
@@ -659,11 +786,19 @@ watch(customDate, (newVal) => {
 }
 
 .time-item {
-  padding: 8px 12px;
-  background-color: #f0f0f0;
-  border: 1px solid #ddd;
+
+  padding: 8px;
+  margin: 4px 0;
+  background-color: #064594;
+  border: 1px solid #c0d0ff;
   border-radius: 4px;
-  color: #333;
+  cursor: pointer;
+  color: #ffffff;
+
+  p {
+    margin: 0;
+  }
+
 }
 
 .time-list.interactive .time-item {
@@ -685,8 +820,12 @@ watch(customDate, (newVal) => {
 
 .availability {
   font-size: 0.8em;
-  margin-top: 5px;
-  color: #666;
+  color: #ffffff;
+  margin-top: 4px;
+  
+  &.selected {
+  color: #064594;
+}
 }
 
 .time-list.interactive .availability,
@@ -748,12 +887,99 @@ input[type="tel"] {
 
 .checkbox-label input {
   margin-right: 8px;
+  width: auto;
 }
 
 .error-message {
   color: #d32f2f;
   font-size: 0.8em;
   margin-top: 5px;
+}
+
+/* Блок промокода */
+.promo-code-section {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.promo-code-header h3 {
+  margin: 0 0 15px 0;
+  color: #064594;
+  font-size: 1.1rem;
+}
+
+.promo-code-input-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.promo-code-input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  min-width: 200px;
+}
+
+.promo-code-button {
+  padding: 12px 20px;
+  background-color: #064594;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+}
+
+.promo-code-button:hover {
+  background-color: #043a7a;
+}
+.promo-code-button:hover:not(:disabled) {
+  background-color: #043a7a;
+}
+
+.promo-code-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.promo-code-success {
+  color: #2e7d32;
+  background-color: #e8f5e9;
+  padding: 10px;
+  border-radius: 4px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.promo-code-applied {
+  color: #2e7d32;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  font-weight: 500;
+}
+
+.promo-error {
+  margin-top: 5px;
+  color: #d32f2f;
+  font-size: 0.9rem;
+}
+
+/* Адаптация для мобильных */
+@media (max-width: 480px) {
+  .promo-code-input-group {
+    flex-direction: column;
+  }
+  
+  .promo-code-button {
+    width: 100%;
+  }
 }
 
 /* Кнопки */
@@ -804,6 +1030,8 @@ button.secondary:hover {
   font-weight: bold;
   margin-top: 10px;
   font-size: 1.1em;
+  padding-top: 10px;
+  border-top: 1px solid #d0e0ff;
 }
 
 .payment-rules {
@@ -891,6 +1119,14 @@ button.secondary:hover {
   input[type="text"],
   input[type="tel"] {
     padding: 8px;
+  }
+  
+  .promo-code-input {
+    flex-direction: column;
+  }
+  
+  .promo-code-input button {
+    width: 100%;
   }
 }
 </style>
