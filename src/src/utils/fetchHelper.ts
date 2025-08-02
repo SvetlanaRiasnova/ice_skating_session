@@ -4,13 +4,13 @@ export async function fetchApi(
     method?: string;
     body?: any;
     params?: Record<string, string>;
-  } = {} // Добавляем значение по умолчанию - пустой объект
+  } = {}
 ) {
-  const baseUrl = "https://gegx68-212-19-10-25.ru.tuna.am";
-  
+  const baseUrl = "https://wo20h9-212-19-10-25.ru.tuna.am";
+ 
   let url = `${baseUrl}/${endpoint}`.replace(/([^:]\/)\/+/g, '$1');
-  
-  // Добавляем проверку на существование options.params
+ 
+  // Добавляем параметры к URL
   if (options?.params) {
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(options.params)) {
@@ -27,7 +27,7 @@ export async function fetchApi(
   };
 
   const config: RequestInit = {
-    method: options?.method || 'GET', // Добавляем опциональную цепочку
+    method: options?.method || 'GET',
     headers,
   };
 
@@ -37,14 +37,42 @@ export async function fetchApi(
 
   try {
     const response = await fetch(url, config);
-    
+   
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Пытаемся получить данные об ошибке от сервера
+      let errorData = null;
+      try {
+        errorData = await response.json();
+      } catch {
+        // Если не удалось получить JSON, используем текст статуса
+        errorData = { message: response.statusText };
+      }
+
+      // Создаем ошибку в формате, который ожидает код
+      const apiError = {
+        response: {
+          status: response.status,
+          data: errorData
+        }
+      };
+      
+      throw apiError;
     }
 
     return await response.json();
   } catch (error) {
+    // Если это уже наша API ошибка, просто перебрасываем
+    if (error && typeof error === 'object' && 'response' in error) {
+      throw error;
+    }
+    
+    // Для других ошибок (сеть, парсинг и т.д.) оборачиваем в стандартный формат
     console.error('Fetch error:', error);
-    throw error;
+    throw {
+      response: {
+        status: 0,
+        data: { message: error instanceof Error ? error.message : 'Network error' }
+      }
+    };
   }
 }
