@@ -1,25 +1,25 @@
-// src/utils/fetchHelper.ts
 export async function fetchApi(
   endpoint: string,
   options: {
     method?: string;
     body?: any;
     params?: Record<string, string>;
-  }
+  } = {} // Добавляем значение по умолчанию - пустой объект
 ) {
-  // Базовый URL можно задать через .env или напрямую
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const baseUrl = "https://gegx68-212-19-10-25.ru.tuna.am";
   
-  // Удаляем дублирующиеся слеши в URL
   let url = `${baseUrl}/${endpoint}`.replace(/([^:]\/)\/+/g, '$1');
   
-  // Добавляем параметры запроса
-  if (options.params) {
+  // Добавляем проверку на существование options.params
+  if (options?.params) {
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(options.params)) {
       if (value) queryParams.append(key, value);
     }
-    url += `?${queryParams.toString()}`;
+    const queryString = queryParams.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
   }
 
   const headers = {
@@ -27,11 +27,11 @@ export async function fetchApi(
   };
 
   const config: RequestInit = {
-    method: options.method || 'GET',
+    method: options?.method || 'GET', // Добавляем опциональную цепочку
     headers,
   };
 
-  if (options.body) {
+  if (options?.body) {
     config.body = JSON.stringify(options.body);
   }
 
