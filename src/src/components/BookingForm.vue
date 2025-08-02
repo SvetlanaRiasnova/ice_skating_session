@@ -58,7 +58,7 @@ function isApiError(error: unknown): error is ApiError {
 }
 
 const isTelegram = ref(false);
-const tgWebApp = ref<any>(null);
+// const tgWebApp = ref<any>(null);
 const initData = ref<string>('');
 
 const paymentStatus = ref({
