@@ -471,7 +471,6 @@ const handleSubmit = async (event: Event) => {
     errorMessage.value = 'Ошибка при расчете стоимости';
   }
 };
-
 const completeOrder = async () => {
   if (!sessionId.value || !selectedTimeId.value) return;
 
@@ -495,18 +494,26 @@ const completeOrder = async () => {
     console.log('Отправляемые данные:', payload);
     const response = await createOrder(payload);
 
- if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-      // Сохраняем данные заказа в localStorage для восстановления после возврата
-      localStorage.setItem('currentOrder', JSON.stringify({
-        uuid: response.uuid,
-        payment_url: response.payment_url
-      }));
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+      // Добавляем обработчик для перехвата изменения history.state
+      window.addEventListener("popstate", function(event) {
+        startPaymentStatusCheck(response.uuid);
+      });
+
+      // Переход к странице оплаты
+      localStorage.setItem('currentOrder', JSON.stringify({ uuid: response.uuid, payment_url: response.payment_url }));
       window.location.href = response.payment_url;
     } else {
-      // Для других устройств используем стандартное открытие окна
+      // Открываем окно оплаты
       paymentWindow.value = window.open(response.payment_url, '_blank');
       
       startPaymentStatusCheck(response.uuid);
+
+      let timeoutId = setTimeout(() => {
+        if (paymentStatus.value.loading === false && paymentStatus.value.success !== null) {
+          paymentWindow.value?.close(); // Закрываем окно после успешной оплаты
+        }
+      }, 10000); // Максимальное ожидание - 10 секунд
     }
   } catch (error) {
     console.error('Ошибка создания заказа:', error);
@@ -514,6 +521,48 @@ const completeOrder = async () => {
     errorMessage.value = 'Ошибка при создании заказа';
   }
 };
+// const completeOrder = async () => {
+//   if (!sessionId.value || !selectedTimeId.value) return;
+
+//   try {
+//     paymentStatus.value = { loading: true, success: null, order: null };
+
+//     const payload: Record<string, any> = {
+//       session: sessionId.value,
+//       adult_count: adults.value,
+//       child_count: children.value,
+//       penguin_count: penguinsCount.value,
+//       skates_count: skatesCount.value,
+//       time: selectedTimeId.value,
+//       user_name: userName.value,
+//       user_phone: normalizePhoneNumber(phoneNumber.value),
+//       promo_code: promoCodeApplied.value ? promoCode.value : null,
+//       promotions: selectedPromotions.value.length > 0 ? selectedPromotions.value : [],
+//       ...(isTelegram.value && initData.value && { InitData: initData.value })
+//     };
+
+//     console.log('Отправляемые данные:', payload);
+//     const response = await createOrder(payload);
+
+//  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+//       // Сохраняем данные заказа в localStorage для восстановления после возврата
+//       localStorage.setItem('currentOrder', JSON.stringify({
+//         uuid: response.uuid,
+//         payment_url: response.payment_url
+//       }));
+//       window.location.href = response.payment_url;
+//     } else {
+//       // Для других устройств используем стандартное открытие окна
+//       paymentWindow.value = window.open(response.payment_url, '_blank');
+      
+//       startPaymentStatusCheck(response.uuid);
+//     }
+//   } catch (error) {
+//     console.error('Ошибка создания заказа:', error);
+//     paymentStatus.value = { loading: false, success: false, order: null };
+//     errorMessage.value = 'Ошибка при создании заказа';
+//   }
+// };
 
 const startPaymentStatusCheck = (uuid: string) => {
   checkStatusInterval.value = window.setInterval(async () => {
