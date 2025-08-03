@@ -13,6 +13,7 @@ declare global {
         isExpanded?: boolean;
         expand?: () => void;
         ready?: () => void;
+        close?: () => void;
       };
     };
   }
@@ -36,6 +37,7 @@ interface SessionDetails {
   date: string;
   times: SessionTime[];
 }
+
 interface Promotion {
   id: number;
   title: string;
@@ -54,7 +56,9 @@ interface ApiError {
     };
   };
 }
+
 type FilterType = '' | 'nearest' | 'weekend' | 'custom';
+
 function isApiError(error: unknown): error is ApiError {
   return typeof error === 'object' && error !== null && 'response' in error;
 }
@@ -95,7 +99,7 @@ const promoCodeDetails = ref<{
   percentage_check: string;
 } | null>(null);
 const totalCost = ref(0);
-const originalCost = ref(0); // Базовая стоимость без скидок
+const originalCost = ref(0);
 const isReviewMode = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
@@ -109,6 +113,8 @@ const promotions = ref<Promotion[]>([]);
 const selectedPromotions = ref<number[]>([]);
 const showPromotionModal = ref(false);
 const currentPromotion = ref<Promotion | null>(null);
+const showConfirmDialog = ref(false);
+const paymentUrl = ref('');
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -122,7 +128,6 @@ const checkTelegramWebApp = (): boolean => {
   }
 };
 
-
 const initTelegramWebApp = async () => {
   if (!checkTelegramWebApp()) {
     console.log('Telegram WebApp недоступен');
@@ -133,28 +138,14 @@ const initTelegramWebApp = async () => {
     tgWebApp.value = window.Telegram?.WebApp;
     
     if (tgWebApp.value) {
-      // Сообщаем Telegram, что приложение готово
       tgWebApp.value.ready?.();
       isTelegramReady.value = true;
       
-      // Разворачиваем приложение на весь экран
       if (!tgWebApp.value.isExpanded) {
         tgWebApp.value.expand?.();
       }
       
-      // Получаем initData
       initData.value = tgWebApp.value.initData || '';
-      console.log('InitData получен:', initData.value ? 'Да' : 'Нет');
-      
-      // // Настройка главной кнопки
-      // setupMainButton();
-      
-      // // Настройка кнопки "Назад"
-      // setupBackButton();
-      
-      // // Включение тактильной обратной связи
-      // enableHapticFeedback();
-      
       console.log('Telegram WebApp успешно инициализирован');
     }
   } catch (error) {
@@ -164,13 +155,39 @@ const initTelegramWebApp = async () => {
 
 onMounted(async () => {
   isTelegram.value = checkTelegramWebApp();
-  console.log('isTelegram:', isTelegram.value);
   
   if (isTelegram.value) {
     await initTelegramWebApp();
   }
+
+  // Проверяем параметры URL после возврата из оплаты
+  const urlParams = new URLSearchParams(window.location.search);
+  const paymentUuid = urlParams.get('uuid');
+  
+  if (paymentUuid) {
+    checkPaymentStatusAfterReturn(paymentUuid);
+  }
 });
 
+const checkPaymentStatusAfterReturn = async (uuid: string) => {
+  try {
+    paymentStatus.value = { loading: true, success: null, order: null };
+    const status = await checkOrderStatus(uuid);
+    
+    if (status.success) {
+      paymentStatus.value = { loading: false, success: true, order: status.order };
+      isReviewMode.value = true;
+    } else {
+      paymentStatus.value = { loading: false, success: false, order: null };
+    }
+    
+    // Очищаем URL от параметров
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } catch (error) {
+    console.error('Ошибка проверки статуса платежа:', error);
+    paymentStatus.value = { loading: false, success: false, order: null };
+  }
+};
 
 const showPenguinsNeeds = computed(() => children.value > 0);
 const showPenguinsInput = computed(() => needPenguins.value);
@@ -243,7 +260,6 @@ const handlePhoneBlur = () => {
 const normalizePhoneNumber = (phone: string): string => {
   let cleaned = phone.replace(/\D/g, '');
 
-  // Если номер начинается с 7, заменяем на 8
   if (cleaned.length > 0 && cleaned[0] === '7') {
     cleaned = '8' + cleaned.substring(1);
   }
@@ -314,7 +330,6 @@ const isPromotionAdded = (promotionId: number) => {
   return selectedPromotions.value.includes(promotionId);
 };
 
-// Универсальная функция для расчета стоимости
 const calculatePrice = async () => {
   if (!sessionId.value || !selectedTimeId.value) return;
 
@@ -336,7 +351,6 @@ const calculatePrice = async () => {
     const priceResult = await getOrderPrice(payload);
     totalCost.value = priceResult.price;
 
-    // Если нет скидок, то это базовая стоимость
     if (!promoCodeApplied.value && selectedPromotions.value.length === 0) {
       originalCost.value = priceResult.price;
     }
@@ -355,7 +369,6 @@ const togglePromotion = async (promotionId: number) => {
 
   showPromotionModal.value = false;
 
-  // Пересчитываем стоимость после изменения акций
   if (sessionId.value && selectedTimeId.value) {
     await calculatePrice();
   }
@@ -371,19 +384,16 @@ const applyPromoCode = async () => {
 
   try {
     if (promoCodeApplied.value) {
-      // Сбрасываем промокод
       promoCodeInput.value = '';
       promoCode.value = '';
       promoCodeApplied.value = false;
       promoCodeDetails.value = null;
     } else {
-      // Применяем промокод
       if (!promoCodeInput.value.trim()) {
         promoCodeError.value = 'Введите промокод';
         return;
       }
 
-      // Проверяем валидность промокода
       try {
         const promoResponse = await checkPromoCode(promoCodeInput.value);
         promoCodeDetails.value = {
@@ -406,9 +416,7 @@ const applyPromoCode = async () => {
       }
     }
 
-    // Пересчитываем стоимость после изменения промокода
     await calculatePrice();
-
   } catch (error) {
     console.error('Ошибка:', error);
     promoCodeError.value = 'Ошибка при обработке промокода';
@@ -440,7 +448,6 @@ const handleSubmit = async (event: Event) => {
   }
 
   try {
-    // Получаем базовую стоимость без скидок для отображения в превью
     const basePricePayload = {
       session: sessionId.value,
       session_time: selectedTimeId.value,
@@ -457,7 +464,6 @@ const handleSubmit = async (event: Event) => {
     const basePriceResult = await getOrderPrice(basePricePayload);
     originalCost.value = basePriceResult.price;
 
-    // Если есть применённые скидки, пересчитываем с ними
     if (promoCodeApplied.value || selectedPromotions.value.length > 0) {
       await calculatePrice();
     } else {
@@ -470,6 +476,27 @@ const handleSubmit = async (event: Event) => {
     console.error('Ошибка расчета стоимости:', error);
     errorMessage.value = 'Ошибка при расчете стоимости';
   }
+};
+
+const openConfirmDialog = (url: string) => {
+  paymentUrl.value = url;
+  showConfirmDialog.value = true;
+};
+
+const handleConfirm = () => {
+  showConfirmDialog.value = false;
+  
+  // Для iOS открываем через window.location
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    window.location.href = paymentUrl.value;
+  } else {
+    paymentWindow.value = window.open(paymentUrl.value, '_blank');
+  }
+};
+
+const handleCancel = () => {
+  showConfirmDialog.value = false;
+  paymentStatus.value = { loading: false, success: null, order: null };
 };
 
 const completeOrder = async () => {
@@ -494,29 +521,13 @@ const completeOrder = async () => {
 
     const response = await createOrder(payload);
 
-    // Для iOS устройств
+    // Для iOS добавляем параметр возврата с UUID
     if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-      // Сохраняем данные заказа в localStorage для восстановления после возврата
-      // localStorage.setItem('currentOrder', JSON.stringify({
-      //   uuid: response.uuid,
-      //   payment_url: response.payment_url,
-      //   timestamp: Date.now()
-      // }));
-      
-      // Показываем пользователю подтверждение
-      const shouldOpen = window.confirm(
-        "Для завершения оплаты необходимо открыть страницу в браузере Safari. " +
-        "Нажмите 'OK', чтобы продолжить, или 'Отмена', чтобы остаться в приложении."
-      );
-      
-      if (shouldOpen) {
-        // Пытаемся открыть ссылку через window.location
-        window.location.href = response.payment_url;
-      } else {
-        paymentStatus.value = { loading: false, success: null, order: null };
-      }
+      const returnUrl = `${window.location.origin}${window.location.pathname}?uuid=${response.uuid}`;
+      const paymentUrlWithReturn = `${response.payment_url}&return_url=${encodeURIComponent(returnUrl)}`;
+      openConfirmDialog(paymentUrlWithReturn);
     } else {
-      // Для других устройств используем стандартное открытие окна
+      // Для десктопа и других платформ стандартное поведение
       paymentWindow.value = window.open(response.payment_url, '_blank');
       startPaymentStatusCheck(response.uuid);
     }
@@ -577,7 +588,6 @@ watch(customDate, (newVal) => {
   if (filterType.value === 'custom' && newVal) loadSessions();
 });
 
-// Добавляем наблюдатели для автоматического пересчета стоимости
 watch([adults, children, penguinsCount, skatesCount], () => {
   if (sessionId.value && selectedTimeId.value) {
     calculatePrice();
@@ -869,6 +879,19 @@ watch(selectedTimeId, (newVal) => {
         </button>
       </template>
     </form>
+    <!-- Модальное окно подтверждения оплаты -->
+    <div v-if="showConfirmDialog" class="modal-overlay">
+      <div class="modal-content">
+        <h3>Подтверждение оплаты</h3>
+        <p>Вы будете перенаправлены на страницу оплаты ЮКассы.</p>
+        <p>После завершения оплаты вы вернетесь обратно в приложение.</p>
+        
+        <div class="form-actions">
+          <button @click="handleConfirm" class="primary">Продолжить</button>
+          <button @click="handleCancel" class="secondary">Отмена</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Модальное окно акции -->
     <div v-if="showPromotionModal && currentPromotion" class="modal-overlay" @click.self="showPromotionModal = false">
@@ -1408,7 +1431,28 @@ button.secondary:hover {
   color: #ffffff !important;
   font-weight: 500;
 }
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
 
+.modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 90%;
+  width: 400px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
 /* Блоки информации */
 .order-summary {
   margin-bottom: 20px;
