@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted, watch, onMounted, nextTick } from 'vue';
+import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions } from '../services/api';
 
 declare global {
@@ -7,7 +7,6 @@ declare global {
     Telegram?: {
       WebApp?: {
         initData?: string;
-        initDataUnsafe?: any;
         openInvoice?: (url: string, callback: (status: string) => void) => void;
         version?: string;
         platform?: string;
@@ -88,14 +87,6 @@ interface ApiError {
   };
 }
 
-interface TelegramUser {
-  id: number;
-  first_name: string;
-  last_name?: string;
-  username?: string;
-  language_code?: string;
-}
-
 type FilterType = '' | 'nearest' | 'weekend' | 'custom';
 
 function isApiError(error: unknown): error is ApiError {
@@ -106,7 +97,6 @@ function isApiError(error: unknown): error is ApiError {
 const isTelegram = ref(false);
 const tgWebApp = ref<any>(null);
 const initData = ref<string>('');
-const telegramUser = ref<TelegramUser | null>(null);
 const isTelegramReady = ref(false);
 
 const paymentStatus = ref({
@@ -191,21 +181,6 @@ const initTelegramWebApp = async () => {
       // Получаем initData
       initData.value = tgWebApp.value.initData || '';
       console.log('InitData получен:', initData.value ? 'Да' : 'Нет');
-      
-      // Получаем данные пользователя из initDataUnsafe
-      if (tgWebApp.value.initDataUnsafe?.user) {
-        telegramUser.value = tgWebApp.value.initDataUnsafe.user;
-        
-        // Автозаполнение имени пользователя
-        if (telegramUser.value.first_name) {
-          const fullName = telegramUser.value.last_name 
-            ? `${telegramUser.value.first_name} ${telegramUser.value.last_name}`
-            : telegramUser.value.first_name;
-          userName.value = fullName;
-        }
-        
-        console.log('Пользователь Telegram:', telegramUser.value);
-      }
       
       // Настройка главной кнопки
       setupMainButton();
@@ -324,16 +299,6 @@ const showTelegramAlert = (message: string): Promise<void> => {
     } else {
       alert(message);
       resolve();
-    }
-  });
-};
-
-const showTelegramConfirm = (message: string): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if (tgWebApp.value?.showConfirm) {
-      tgWebApp.value.showConfirm(message, (confirmed: boolean) => resolve(confirmed));
-    } else {
-      resolve(confirm(message));
     }
   });
 };
