@@ -1,5 +1,5 @@
 <template>
-            <div class="modal-overlay" v-if="showPolicyModal">
+            <div class="modal-overlay" v-if="props.showPolicyModal">
     <div class="modal-container">
       
       <div class="modal-content">
