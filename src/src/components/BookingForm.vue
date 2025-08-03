@@ -11,6 +11,8 @@ declare global {
         version?: string;
         platform?: string;
         isExpanded?: boolean;
+        expand?: () => void;
+        ready?: () => void;
       };
     };
   }
@@ -58,8 +60,9 @@ function isApiError(error: unknown): error is ApiError {
 }
 
 const isTelegram = ref(false);
-// const tgWebApp = ref<any>(null);
+const tgWebApp = ref<any>(null);
 const initData = ref<string>('');
+const isTelegramReady = ref(false);
 
 const paymentStatus = ref({
   loading: false,
@@ -119,10 +122,55 @@ const checkTelegramWebApp = (): boolean => {
   }
 };
 
-onMounted(() => {
+
+const initTelegramWebApp = async () => {
+  if (!checkTelegramWebApp()) {
+    console.log('Telegram WebApp недоступен');
+    return;
+  }
+
+  try {
+    tgWebApp.value = window.Telegram?.WebApp;
+    
+    if (tgWebApp.value) {
+      // Сообщаем Telegram, что приложение готово
+      tgWebApp.value.ready?.();
+      isTelegramReady.value = true;
+      
+      // Разворачиваем приложение на весь экран
+      if (!tgWebApp.value.isExpanded) {
+        tgWebApp.value.expand?.();
+      }
+      
+      // Получаем initData
+      initData.value = tgWebApp.value.initData || '';
+      console.log('InitData получен:', initData.value ? 'Да' : 'Нет');
+      
+      // // Настройка главной кнопки
+      // setupMainButton();
+      
+      // // Настройка кнопки "Назад"
+      // setupBackButton();
+      
+      // // Включение тактильной обратной связи
+      // enableHapticFeedback();
+      
+      console.log('Telegram WebApp успешно инициализирован');
+    }
+  } catch (error) {
+    console.error('Ошибка инициализации Telegram WebApp:', error);
+  }
+};
+
+onMounted(async () => {
   isTelegram.value = checkTelegramWebApp();
   console.log('isTelegram:', isTelegram.value);
+  
+  if (isTelegram.value) {
+    await initTelegramWebApp();
+  }
 });
+
 
 const showPenguinsNeeds = computed(() => children.value > 0);
 const showPenguinsInput = computed(() => needPenguins.value);
@@ -440,7 +488,8 @@ const completeOrder = async () => {
       user_name: userName.value,
       user_phone: normalizePhoneNumber(phoneNumber.value),
       promo_code: promoCodeApplied.value ? promoCode.value : null,
-      promotions: selectedPromotions.value.length > 0 ? selectedPromotions.value : []
+      promotions: selectedPromotions.value.length > 0 ? selectedPromotions.value : [],
+      ...(isTelegram.value && initData.value && { InitData: initData.value })
     };
 
     console.log('Отправляемые данные:', payload);
@@ -448,7 +497,7 @@ const completeOrder = async () => {
 
     if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
       window.Telegram.WebApp.openInvoice(response.payment_url, (status: string) => {
-        if (status === 'paid') {
+        if (status === 'success=== true') {
           paymentStatus.value = { loading: false, success: true, order: response };
         } else {
           paymentStatus.value = { loading: false, success: false, order: null };
@@ -599,7 +648,7 @@ watch(selectedTimeId, (newVal) => {
     </div>
 
     <!-- Форма бронирования -->
-    <form class="booking-form" @submit="handleSubmit" v-if="!isTelegram">
+    <form class="booking-form" @submit="handleSubmit">
       <template v-if="isReviewMode">
         <!-- Блок подтверждения заказа -->
         <div v-if="paymentStatus.loading" class="payment-loading">
