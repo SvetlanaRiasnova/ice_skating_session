@@ -496,18 +496,12 @@ const completeOrder = async () => {
     const response = await createOrder(payload);
 
     // Всегда открываем в новом окне браузера
-    if (isTelegram.value && window.Telegram?.WebApp?.openLink) {
-      // В Telegram WebApp используем openLink для открытия в системном браузере
-      window.Telegram.WebApp.openLink(response.payment_url);
-    } else {
-      // В обычном браузере просто открываем новое окно
-      paymentWindow.value = window.open(response.payment_url, '_blank');
-      
-      if (!paymentWindow.value) {
-        errorMessage.value = 'Пожалуйста, разрешите всплывающие окна для оплаты';
-        paymentStatus.value = { loading: false, success: false, order: null };
-        return;
-      }
+    paymentWindow.value = window.open(response.payment_url, '_blank');
+    
+    if (!paymentWindow.value) {
+      errorMessage.value = 'Пожалуйста, разрешите всплывающие окна для оплаты';
+      paymentStatus.value = { loading: false, success: false, order: null };
+      return;
     }
 
     // Начинаем проверку статуса платежа
@@ -521,50 +515,22 @@ const completeOrder = async () => {
 };
 
 const startPaymentStatusCheck = (uuid: string) => {
-  // Очищаем предыдущий интервал, если он был
-  if (checkStatusInterval.value) {
-    clearInterval(checkStatusInterval.value);
-  }
-
-  // Устанавливаем новый интервал проверки
   checkStatusInterval.value = window.setInterval(async () => {
     try {
       const status = await checkOrderStatus(uuid);
-      console.log('Статус платежа:', status);
-
       if (status.success) {
-        // Платеж успешен
         clearInterval(checkStatusInterval.value!);
         paymentStatus.value = { loading: false, success: true, order: status.order };
-        
-        // Закрываем платежное окно, если оно открыто
-        if (paymentWindow.value && !paymentWindow.value.closed) {
-          paymentWindow.value.close();
-        }
-      } else if (status.error) {
-        // Ошибка платежа
-        clearInterval(checkStatusInterval.value!);
-        paymentStatus.value = { loading: false, success: false, order: null };
-        errorMessage.value = status.error.message || 'Ошибка при обработке платежа';
+        paymentWindow.value?.close();
       }
-      // Если статус pending, продолжаем проверять
     } catch (error) {
       console.error('Ошибка проверки статуса:', error);
       clearInterval(checkStatusInterval.value!);
       paymentStatus.value = { loading: false, success: false, order: null };
-      errorMessage.value = 'Ошибка при проверке статуса платежа';
     }
-  }, 5000); // Проверяем каждые 5 секунд
-
-  // Автоматически останавливаем проверку через 30 минут
-  setTimeout(() => {
-    if (checkStatusInterval.value && paymentStatus.value.loading) {
-      clearInterval(checkStatusInterval.value);
-      paymentStatus.value = { loading: false, success: false, order: null };
-      errorMessage.value = 'Время ожидания платежа истекло';
-    }
-  }, 1800000); // 30 минут
+  }, 5000);
 };
+
 const resetPaymentStatus = () => {
   paymentStatus.value = { loading: false, success: null, order: null };
 };
