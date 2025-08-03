@@ -13,7 +13,6 @@ declare global {
         isExpanded?: boolean;
         expand?: () => void;
         ready?: () => void;
-        close?: () => void;
       };
     };
   }
@@ -96,7 +95,7 @@ const promoCodeDetails = ref<{
   percentage_check: string;
 } | null>(null);
 const totalCost = ref(0);
-const originalCost = ref(0);
+const originalCost = ref(0); // Базовая стоимость без скидок
 const isReviewMode = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
@@ -110,7 +109,6 @@ const promotions = ref<Promotion[]>([]);
 const selectedPromotions = ref<number[]>([]);
 const showPromotionModal = ref(false);
 const currentPromotion = ref<Promotion | null>(null);
-const isIOS = ref(/iPad|iPhone|iPod/.test(navigator.userAgent));
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -124,6 +122,7 @@ const checkTelegramWebApp = (): boolean => {
   }
 };
 
+
 const initTelegramWebApp = async () => {
   if (!checkTelegramWebApp()) {
     console.log('Telegram WebApp недоступен');
@@ -134,36 +133,29 @@ const initTelegramWebApp = async () => {
     tgWebApp.value = window.Telegram?.WebApp;
     
     if (tgWebApp.value) {
+      // Сообщаем Telegram, что приложение готово
       tgWebApp.value.ready?.();
       isTelegramReady.value = true;
       
+      // Разворачиваем приложение на весь экран
       if (!tgWebApp.value.isExpanded) {
         tgWebApp.value.expand?.();
       }
       
+      // Получаем initData
       initData.value = tgWebApp.value.initData || '';
       console.log('InitData получен:', initData.value ? 'Да' : 'Нет');
       
-      // Проверяем есть ли сохраненный заказ для iOS
-      if (isIOS.value) {
-        const savedOrder = localStorage.getItem('currentOrder');
-        if (savedOrder) {
-          const order = JSON.parse(savedOrder);
-          try {
-            const status = await checkOrderStatus(order.uuid);
-            if (status.success) {
-              paymentStatus.value = { loading: false, success: true, order: status.order };
-              isReviewMode.value = true;
-              localStorage.removeItem('currentOrder');
-            } else {
-              localStorage.removeItem('currentOrder');
-            }
-          } catch (error) {
-            console.error('Ошибка проверки сохраненного заказа:', error);
-            localStorage.removeItem('currentOrder');
-          }
-        }
-      }
+      // // Настройка главной кнопки
+      // setupMainButton();
+      
+      // // Настройка кнопки "Назад"
+      // setupBackButton();
+      
+      // // Включение тактильной обратной связи
+      // enableHapticFeedback();
+      
+      console.log('Telegram WebApp успешно инициализирован');
     }
   } catch (error) {
     console.error('Ошибка инициализации Telegram WebApp:', error);
@@ -178,6 +170,7 @@ onMounted(async () => {
     await initTelegramWebApp();
   }
 });
+
 
 const showPenguinsNeeds = computed(() => children.value > 0);
 const showPenguinsInput = computed(() => needPenguins.value);
@@ -250,6 +243,7 @@ const handlePhoneBlur = () => {
 const normalizePhoneNumber = (phone: string): string => {
   let cleaned = phone.replace(/\D/g, '');
 
+  // Если номер начинается с 7, заменяем на 8
   if (cleaned.length > 0 && cleaned[0] === '7') {
     cleaned = '8' + cleaned.substring(1);
   }
@@ -320,6 +314,7 @@ const isPromotionAdded = (promotionId: number) => {
   return selectedPromotions.value.includes(promotionId);
 };
 
+// Универсальная функция для расчета стоимости
 const calculatePrice = async () => {
   if (!sessionId.value || !selectedTimeId.value) return;
 
@@ -341,6 +336,7 @@ const calculatePrice = async () => {
     const priceResult = await getOrderPrice(payload);
     totalCost.value = priceResult.price;
 
+    // Если нет скидок, то это базовая стоимость
     if (!promoCodeApplied.value && selectedPromotions.value.length === 0) {
       originalCost.value = priceResult.price;
     }
@@ -359,6 +355,7 @@ const togglePromotion = async (promotionId: number) => {
 
   showPromotionModal.value = false;
 
+  // Пересчитываем стоимость после изменения акций
   if (sessionId.value && selectedTimeId.value) {
     await calculatePrice();
   }
@@ -374,16 +371,19 @@ const applyPromoCode = async () => {
 
   try {
     if (promoCodeApplied.value) {
+      // Сбрасываем промокод
       promoCodeInput.value = '';
       promoCode.value = '';
       promoCodeApplied.value = false;
       promoCodeDetails.value = null;
     } else {
+      // Применяем промокод
       if (!promoCodeInput.value.trim()) {
         promoCodeError.value = 'Введите промокод';
         return;
       }
 
+      // Проверяем валидность промокода
       try {
         const promoResponse = await checkPromoCode(promoCodeInput.value);
         promoCodeDetails.value = {
@@ -406,6 +406,7 @@ const applyPromoCode = async () => {
       }
     }
 
+    // Пересчитываем стоимость после изменения промокода
     await calculatePrice();
 
   } catch (error) {
@@ -439,6 +440,7 @@ const handleSubmit = async (event: Event) => {
   }
 
   try {
+    // Получаем базовую стоимость без скидок для отображения в превью
     const basePricePayload = {
       session: sessionId.value,
       session_time: selectedTimeId.value,
@@ -455,6 +457,7 @@ const handleSubmit = async (event: Event) => {
     const basePriceResult = await getOrderPrice(basePricePayload);
     originalCost.value = basePriceResult.price;
 
+    // Если есть применённые скидки, пересчитываем с ними
     if (promoCodeApplied.value || selectedPromotions.value.length > 0) {
       await calculatePrice();
     } else {
@@ -492,57 +495,23 @@ const completeOrder = async () => {
     console.log('Отправляемые данные:', payload);
     const response = await createOrder(payload);
 
-    if (isIOS.value && isTelegram.value) {
-      // Для iOS в Telegram WebApp сохраняем данные заказа и открываем платежную ссылку
+ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+      // Сохраняем данные заказа в localStorage для восстановления после возврата
       localStorage.setItem('currentOrder', JSON.stringify({
         uuid: response.uuid,
-        payment_url: response.payment_url,
-        timestamp: new Date().getTime()
+        payment_url: response.payment_url
       }));
-      
-      // Очищаем сохраненный заказ через 30 минут на случай, если пользователь не вернется
-      setTimeout(() => {
-        localStorage.removeItem('currentOrder');
-      }, 30 * 60 * 1000);
-      
-      // Открываем платежное окно
       window.location.href = response.payment_url;
-    } else if (isTelegram.value && tgWebApp.value?.openInvoice) {
-      // Для Telegram WebApp используем встроенный метод открытия счета
-      tgWebApp.value.openInvoice(response.payment_url, (status: string) => {
-        if (status === 'paid') {
-          checkPaymentStatus(response.uuid);
-        } else {
-          paymentStatus.value = { loading: false, success: false, order: null };
-          errorMessage.value = 'Платеж не был завершен';
-        }
-      });
     } else {
-      // Для других платформ открываем новое окно
+      // Для других устройств используем стандартное открытие окна
       paymentWindow.value = window.open(response.payment_url, '_blank');
+      
       startPaymentStatusCheck(response.uuid);
     }
   } catch (error) {
     console.error('Ошибка создания заказа:', error);
     paymentStatus.value = { loading: false, success: false, order: null };
     errorMessage.value = 'Ошибка при создании заказа';
-  }
-};
-
-const checkPaymentStatus = async (uuid: string) => {
-  try {
-    const status = await checkOrderStatus(uuid);
-    if (status.success) {
-      paymentStatus.value = { loading: false, success: true, order: status.order };
-      if (isIOS.value) {
-        localStorage.removeItem('currentOrder');
-      }
-    } else {
-      paymentStatus.value = { loading: false, success: false, order: null };
-    }
-  } catch (error) {
-    console.error('Ошибка проверки статуса:', error);
-    paymentStatus.value = { loading: false, success: false, order: null };
   }
 };
 
@@ -596,6 +565,7 @@ watch(customDate, (newVal) => {
   if (filterType.value === 'custom' && newVal) loadSessions();
 });
 
+// Добавляем наблюдатели для автоматического пересчета стоимости
 watch([adults, children, penguinsCount, skatesCount], () => {
   if (sessionId.value && selectedTimeId.value) {
     calculatePrice();
@@ -672,6 +642,7 @@ watch(selectedTimeId, (newVal) => {
           </svg>
         </div>
         <a href="https://t.me/roomly_test_bot" target="_blank">
+
           Купить билеты
         </a>
       </div>
@@ -916,7 +887,6 @@ watch(selectedTimeId, (newVal) => {
     </div>
   </div>
 </template>
-
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
 
@@ -962,6 +932,7 @@ watch(selectedTimeId, (newVal) => {
   width: 100%;
   padding: 10px;
   border: 1px solid #ccc;
+
   border-radius: 4px;
   box-sizing: border-box;
 }
@@ -996,6 +967,7 @@ watch(selectedTimeId, (newVal) => {
 }
 
 .time-item {
+
   padding: 8px;
   margin: 4px 0;
   background-color: #064594;
@@ -1003,10 +975,11 @@ watch(selectedTimeId, (newVal) => {
   border-radius: 4px;
   cursor: pointer;
   color: #ffffff;
-}
 
-.time-item p {
-  margin: 0;
+  p {
+    margin: 0;
+  }
+
 }
 
 .time-list.interactive .time-item {
@@ -1030,10 +1003,10 @@ watch(selectedTimeId, (newVal) => {
   font-size: 0.8em;
   color: #ffffff;
   margin-top: 4px;
-}
 
-.availability.selected {
-  color: #064594;
+  &.selected {
+    color: #064594;
+  }
 }
 
 .time-list.interactive .availability,
@@ -1103,6 +1076,7 @@ input[type="tel"] {
   font-size: 0.8em;
   margin-top: 5px;
 }
+
 
 .promotions-section {
   margin: 20px 0;
