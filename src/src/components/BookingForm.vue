@@ -502,8 +502,9 @@ const completeOrder = async () => {
         'telegram-payments.yoomoney.ru'
       );
     }
+    
     if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
-      window.Telegram.WebApp.openInvoice(response.payment_url, (status: string) => {
+      window.Telegram.WebApp.openInvoice(paymentUrl, (status: string) => {
         if (status === 'success === true') {
           paymentStatus.value = { loading: false, success: true, order: response };
         } else {
