@@ -494,10 +494,17 @@ const completeOrder = async () => {
 
     console.log('Отправляемые данные:', payload);
     const response = await createOrder(payload);
+    let paymentUrl = response.payment_url;
 
+    if (isTelegram.value) {
+      paymentUrl = paymentUrl.replace(
+        'yoomoney.ru/checkout/payments/v2/contract',
+        'telegram-payments.yoomoney.ru'
+      );
+    }
     if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
       window.Telegram.WebApp.openInvoice(response.payment_url, (status: string) => {
-        if (status === 'success=== true') {
+        if (status === 'success === true') {
           paymentStatus.value = { loading: false, success: true, order: response };
         } else {
           paymentStatus.value = { loading: false, success: false, order: null };
