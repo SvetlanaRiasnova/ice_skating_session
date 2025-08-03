@@ -495,19 +495,24 @@ const completeOrder = async () => {
     console.log('Отправляемые данные:', payload);
     const response = await createOrder(payload);
 
-    // if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
-    //   window.Telegram.WebApp.openInvoice(response.payment_url, (status: string) => {
-    //     if (status === 'paid') {
-    //       paymentStatus.value = { loading: false, success: true, order: response };
-    //     } else {
-    //       paymentStatus.value = { loading: false, success: false, order: null };
-    //     }
-    //   });
-    // } else {
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) {
+      // Сохраняем данные заказа в localStorage для восстановления после возврата
+      localStorage.setItem('currentOrder', JSON.stringify({
+        uuid: response.uuid,
+        payment_url: response.payment_url
+      }));
+      window.location.href = response.payment_url;
+    } else {
+      // Для других устройств используем стандартное открытие окна
       paymentWindow.value = window.open(response.payment_url, '_blank');
-      
+      if (!paymentWindow.value) {
+        errorMessage.value = 'Пожалуйста, разрешите всплывающие окна для оплаты';
+        paymentStatus.value = { loading: false, success: false, order: null };
+        return;
+      }
       startPaymentStatusCheck(response.uuid);
-    // }
+    }
+     
   } catch (error) {
     console.error('Ошибка создания заказа:', error);
     paymentStatus.value = { loading: false, success: false, order: null };
