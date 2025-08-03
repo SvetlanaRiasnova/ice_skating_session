@@ -216,30 +216,6 @@ const validateName = (name: string): boolean => {
   return true;
 };
 
-// const validatePhone = (phone: string): boolean => {
-//   const cleaned = phone.replace(/\D/g, '');
-//   return cleaned.length === 11 && (cleaned[0] === '7' || cleaned[0] === '8');
-// };
-
-// const formatDate = (dateString: string): string => {
-//   if (!dateString) return '';
-//   const date = new Date(dateString);
-//   return date.toLocaleDateString('ru-RU');
-// };
-
-// const formatPhoneNumber = (value: string): string => {
-//   let cleaned = value.replace(/\D/g, '');
-//   if (cleaned.length > 0 && !['7', '8'].includes(cleaned[0])) {
-//     cleaned = '7' + cleaned;
-//   }
-//   cleaned = cleaned.substring(0, 11);
-
-//   const match = cleaned.match(/^(\d)(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
-//   if (!match) return '';
-
-//   return `+${match[1]}${match[2] ? ` (${match[2]}` : ''}${match[3] ? `) ${match[3]}` : ''}${match[4] ? `-${match[4]}` : ''}${match[5] ? `-${match[5]}` : ''}`;
-// };
-
 const handlePhoneInput = (event: Event) => {
   const input = event.target as HTMLInputElement;
   let value = input.value.replace(/\D/g, '');
@@ -258,16 +234,6 @@ const handlePhoneBlur = () => {
   }
   phoneError.value = validatePhone(phoneNumber.value) ? '' : 'Введите корректный номер телефона (начинается с 7 или 8)';
 };
-
-// const normalizePhoneNumber = (phone: string): string => {
-//   let cleaned = phone.replace(/\D/g, '');
-
-//   if (cleaned.length > 0 && cleaned[0] === '7') {
-//     cleaned = '8' + cleaned.substring(1);
-//   }
-
-//   return cleaned.substring(0, 11);
-// };
 
 async function loadSessions() {
   if (!filterType.value || (filterType.value === 'custom' && !customDate.value)) {
@@ -848,7 +814,7 @@ watch(selectedTimeId, (newVal) => {
         <div class="form-group checkbox-group">
           <label class="checkbox-label">
             <input type="checkbox" v-model="privacyPolicy">
-            <span>Я согласен с <a href="#" @click.prevent="showPolicyModal = true">Политикой
+            <span>Я согласен с <a href="#" class="policy-link" @click.prevent="showPolicyModal = true">Политикой
                 конфиденциальности</a></span>
           </label>
         </div>
@@ -919,12 +885,12 @@ watch(selectedTimeId, (newVal) => {
   color: #064594;
   max-width: 500px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 10px;
 }
 
 .booking-container.telegram {
   max-width: 100%;
-  padding: 15px;
+  padding: 10px;
 }
 
 /* Стили фильтра */
@@ -1006,16 +972,6 @@ watch(selectedTimeId, (newVal) => {
 
 }
 
-/* .time-list.interactive .time-item {
-  cursor: pointer;
-  background-color: #064594;
-  color: white;
-} */
-
-/* .time-list.interactive .time-item:hover {
-  background-color: #043a7a;
-} */
-
 .time-item.selected-time {
   background-color: white;
   color: #064594;
@@ -1033,11 +989,6 @@ watch(selectedTimeId, (newVal) => {
     color: #064594;
   }
 }
-
-/* .time-list.interactive .availability,
-.time-item.selected-time .availability {
-  color: white;
-} */
 
 .time-item.selected-time .availability {
   color: #064594;
