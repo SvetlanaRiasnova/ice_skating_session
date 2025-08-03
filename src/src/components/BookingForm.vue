@@ -2,6 +2,8 @@
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions } from '../services/api';
 import PrivacyPolicyModal from './PrivacyPolicyModal.vue';
+import { formatDate } from '../utils/dateFormatter';
+import { formatPhoneNumber, normalizePhoneNumber, validatePhone } from '../utils/phoneFormatter';
 
 declare global {
   interface Window {
@@ -214,29 +216,29 @@ const validateName = (name: string): boolean => {
   return true;
 };
 
-const validatePhone = (phone: string): boolean => {
-  const cleaned = phone.replace(/\D/g, '');
-  return cleaned.length === 11 && (cleaned[0] === '7' || cleaned[0] === '8');
-};
+// const validatePhone = (phone: string): boolean => {
+//   const cleaned = phone.replace(/\D/g, '');
+//   return cleaned.length === 11 && (cleaned[0] === '7' || cleaned[0] === '8');
+// };
 
-const formatDate = (dateString: string): string => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('ru-RU');
-};
+// const formatDate = (dateString: string): string => {
+//   if (!dateString) return '';
+//   const date = new Date(dateString);
+//   return date.toLocaleDateString('ru-RU');
+// };
 
-const formatPhoneNumber = (value: string): string => {
-  let cleaned = value.replace(/\D/g, '');
-  if (cleaned.length > 0 && !['7', '8'].includes(cleaned[0])) {
-    cleaned = '7' + cleaned;
-  }
-  cleaned = cleaned.substring(0, 11);
+// const formatPhoneNumber = (value: string): string => {
+//   let cleaned = value.replace(/\D/g, '');
+//   if (cleaned.length > 0 && !['7', '8'].includes(cleaned[0])) {
+//     cleaned = '7' + cleaned;
+//   }
+//   cleaned = cleaned.substring(0, 11);
 
-  const match = cleaned.match(/^(\d)(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
-  if (!match) return '';
+//   const match = cleaned.match(/^(\d)(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
+//   if (!match) return '';
 
-  return `+${match[1]}${match[2] ? ` (${match[2]}` : ''}${match[3] ? `) ${match[3]}` : ''}${match[4] ? `-${match[4]}` : ''}${match[5] ? `-${match[5]}` : ''}`;
-};
+//   return `+${match[1]}${match[2] ? ` (${match[2]}` : ''}${match[3] ? `) ${match[3]}` : ''}${match[4] ? `-${match[4]}` : ''}${match[5] ? `-${match[5]}` : ''}`;
+// };
 
 const handlePhoneInput = (event: Event) => {
   const input = event.target as HTMLInputElement;
@@ -257,15 +259,15 @@ const handlePhoneBlur = () => {
   phoneError.value = validatePhone(phoneNumber.value) ? '' : 'Введите корректный номер телефона (начинается с 7 или 8)';
 };
 
-const normalizePhoneNumber = (phone: string): string => {
-  let cleaned = phone.replace(/\D/g, '');
+// const normalizePhoneNumber = (phone: string): string => {
+//   let cleaned = phone.replace(/\D/g, '');
 
-  if (cleaned.length > 0 && cleaned[0] === '7') {
-    cleaned = '8' + cleaned.substring(1);
-  }
+//   if (cleaned.length > 0 && cleaned[0] === '7') {
+//     cleaned = '8' + cleaned.substring(1);
+//   }
 
-  return cleaned.substring(0, 11);
-};
+//   return cleaned.substring(0, 11);
+// };
 
 async function loadSessions() {
   if (!filterType.value || (filterType.value === 'custom' && !customDate.value)) {
@@ -627,14 +629,14 @@ watch(selectedTimeId, (newVal) => {
             {{ formatDate(session.date) }}
 
             <ul v-if="sessionId === session.id && selectedTimes.length" class="time-list"
-              :class="{ 'interactive': isTelegram }">
+              >
               <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id"
                 class="time-item" :class="{
                   'selected-time': selectedTimeId === time.id,
                   'clickable': isTelegram
                 }">
                 {{ time.start_time }} - {{ time.end_time }}
-                <div class="availability" :class="{ 'selected': isTelegram && (selectedTimeId === time.id) }">
+                <div class="availability" :class="{ 'selected': selectedTimeId === time.id }">
                   <p>Мест: {{ time.available_places_count }}</p>
                   <p v-if="time.available_penguin_count !== undefined">
                     Пингвинов: {{ time.available_penguin_count }}
@@ -650,25 +652,6 @@ watch(selectedTimeId, (newVal) => {
         </p>
 
       </template>
-      <!-- <div v-if="!isTelegram" class="button-tg">
-        <div class="button-tg__icon"> <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-            xmlns="http://www.w3.org/2000/svg">
-            <g clip-path="url(#clip0_550_1277)">
-              <path d="M15 10L11 14L17 20L21 4L3 11L7 13L9 19L12 15" stroke="#ffffff" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round" />
-            </g>
-            <defs>
-              <clipPath id="clip0_550_1277">
-                <rect width="24" height="24" fill="white" />
-              </clipPath>
-            </defs>
-          </svg>
-        </div>
-        <a href="https://t.me/roomly_test_bot" target="_blank">
-
-          Купить билеты
-        </a>
-      </div> -->
     </div>
 
     <!-- Форма бронирования -->
@@ -747,11 +730,14 @@ watch(selectedTimeId, (newVal) => {
           </div>
 
           <div class="payment-rules">
-            <h3>Правила оплаты:</h3>
+            <h3>ВНИМАНИЕ! Прочтите до конца!</h3>
             <ol>
-              <li>Оплата производится онлайн банковской картой.</li>
-              <li>При отмене бронирования возврат средств возможен только в течение суток.</li>
-              <li>Указанные контактные данные необходимы для связи с вами.</li>
+              <li>Ознакомьтесь с правилами посещения Ледовой арены IceMETP<a href="#"></a></li>
+              <li>Оплачивая заказ Вы соглашаетесь с правилами посещения Ледовой арены IceMETP</li>
+              <li>На оплату заказа Вам дается 10 минут, иначе заказ будет отменен</li>
+              <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать ПИН-КОД, по которому Вы получите пропуск на арену</li>
+              <li>Вернуть билет можно не позднее чем за два часадо начала сеанса, лично обратившись в администрацию ледовой арены</li>
+              <li>Нажимая кнопку "Перейти к оплате", Вы подтверждаете, что ознакомились с правилами и согласны с ними.</li>
             </ol>
           </div>
 
@@ -818,7 +804,7 @@ watch(selectedTimeId, (newVal) => {
         <div class="form-group" v-if="showPenguinsNeeds">
           <label class="checkbox-label">
             <input type="checkbox" v-model="needPenguins">
-            <span>Требуется ли пингвин?</span>
+            <span>Требуется ли фигура-помощник "Пингвин" (для детей до 7 лет)?</span>
           </label>
         </div>
 
@@ -1020,15 +1006,15 @@ watch(selectedTimeId, (newVal) => {
 
 }
 
-.time-list.interactive .time-item {
+/* .time-list.interactive .time-item {
   cursor: pointer;
   background-color: #064594;
   color: white;
-}
+} */
 
-.time-list.interactive .time-item:hover {
+/* .time-list.interactive .time-item:hover {
   background-color: #043a7a;
-}
+} */
 
 .time-item.selected-time {
   background-color: white;
@@ -1048,10 +1034,10 @@ watch(selectedTimeId, (newVal) => {
   }
 }
 
-.time-list.interactive .availability,
+/* .time-list.interactive .availability,
 .time-item.selected-time .availability {
   color: white;
-}
+} */
 
 .time-item.selected-time .availability {
   color: #064594;
@@ -1231,6 +1217,7 @@ input[type="tel"] {
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
+  max-width: 500px;
 }
 
 .close-button {
@@ -1242,14 +1229,21 @@ input[type="tel"] {
   font-size: 24px;
   cursor: pointer;
   color: #064594;
+  margin: 0; 
+  padding: 0; 
+  line-height: 1; 
+  width: 30px; 
+  height: 30px; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-
 .promotion-image {
   width: 100%;
   max-height: 200px;
-  object-fit: contain;
+  object-fit: cover;
   margin: 10px 0;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .promotion-dates {
@@ -1385,7 +1379,7 @@ button {
 button.primary {
   background-color: #064594;
   color: white;
-  margin-top: 20px;
+  /* margin-top: 20px; */
 }
 
 button.primary:hover {
@@ -1486,6 +1480,10 @@ button.secondary:hover {
   padding-left: 20px;
   margin-top: 10px;
 }
+.payment-rules li {
+  padding-bottom: 10px;
+  font-size: 14px;
+}
 
 .order-success {
   margin: 20px 0;
@@ -1523,6 +1521,7 @@ button.secondary:hover {
 .payment-loading {
   text-align: center;
   padding: 20px;
+  font-size: 14px;
 }
 
 .spinner {
