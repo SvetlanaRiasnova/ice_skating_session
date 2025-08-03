@@ -1047,6 +1047,11 @@ input[type="tel"] {
   width: auto;
 }
 
+.policy-link {
+  text-decoration: none;
+  color: #064594;
+  text-decoration: underline;
+}
 .error-message {
   color: #d32f2f;
   font-size: 0.8em;
