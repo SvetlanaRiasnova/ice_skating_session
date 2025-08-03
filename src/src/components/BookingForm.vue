@@ -495,7 +495,7 @@ const completeOrder = async () => {
     console.log('Отправляемые данные:', payload);
     const response = await createOrder(payload);
 
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent) {
+ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
       // Сохраняем данные заказа в localStorage для восстановления после возврата
       localStorage.setItem('currentOrder', JSON.stringify({
         uuid: response.uuid,
@@ -512,7 +512,6 @@ const completeOrder = async () => {
       }
       startPaymentStatusCheck(response.uuid);
     }
-     
   } catch (error) {
     console.error('Ошибка создания заказа:', error);
     paymentStatus.value = { loading: false, success: false, order: null };
