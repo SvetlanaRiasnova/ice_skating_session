@@ -492,20 +492,32 @@ const completeOrder = async () => {
       ...(isTelegram.value && initData.value && { InitData: initData.value })
     };
 
-    console.log('Отправляемые данные:', payload);
     const response = await createOrder(payload);
 
- if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    // Для iOS устройств
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
       // Сохраняем данные заказа в localStorage для восстановления после возврата
-      localStorage.setItem('currentOrder', JSON.stringify({
-        uuid: response.uuid,
-        payment_url: response.payment_url
-      }));
-      window.location.href = response.payment_url;
+      // localStorage.setItem('currentOrder', JSON.stringify({
+      //   uuid: response.uuid,
+      //   payment_url: response.payment_url,
+      //   timestamp: Date.now()
+      // }));
+      
+      // Показываем пользователю подтверждение
+      const shouldOpen = window.confirm(
+        "Для завершения оплаты необходимо открыть страницу в браузере Safari. " +
+        "Нажмите 'OK', чтобы продолжить, или 'Отмена', чтобы остаться в приложении."
+      );
+      
+      if (shouldOpen) {
+        // Пытаемся открыть ссылку через window.location
+        window.location.href = response.payment_url;
+      } else {
+        paymentStatus.value = { loading: false, success: null, order: null };
+      }
     } else {
       // Для других устройств используем стандартное открытие окна
       paymentWindow.value = window.open(response.payment_url, '_blank');
-      
       startPaymentStatusCheck(response.uuid);
     }
   } catch (error) {
