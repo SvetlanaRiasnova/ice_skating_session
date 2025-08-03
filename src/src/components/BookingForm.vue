@@ -494,34 +494,26 @@ const completeOrder = async () => {
 
     console.log('Отправляемые данные:', payload);
     const response = await createOrder(payload);
-    let paymentUrl = response.payment_url;
 
-    if (isTelegram.value) {
-      paymentUrl = paymentUrl.replace(
-        'https://yoomoney.ru/checkout/payments/v2/contract',
-        'https://telegram-payments.yoomoney.ru'
-      );
-    }
-
-    if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
-      window.Telegram.WebApp.openInvoice(paymentUrl, (status: string) => {
-        if (status === 'success') {
-          paymentStatus.value = { loading: false, success: true, order: response };
-        } else {
-          paymentStatus.value = { loading: false, success: false, order: null };
-          errorMessage.value = 'Ошибка при оплате заказа';
-        }
-      });
-    } else {
-      paymentWindow.value = window.open(response.payment_url, '_blank');
+    // Всегда открываем платежную страницу в новом окне браузера
+    paymentWindow.value = window.open(response.payment_url, '_blank');
+    
+    if (paymentWindow.value) {
+      // Начинаем проверку статуса платежа
       startPaymentStatusCheck(response.uuid);
+    } else {
+      // Если браузер заблокировал popup, показываем сообщение
+      errorMessage.value = 'Пожалуйста, разрешите всплывающие окна для завершения оплаты';
+      paymentStatus.value = { loading: false, success: false, order: null };
     }
+
   } catch (error) {
     console.error('Ошибка создания заказа:', error);
     paymentStatus.value = { loading: false, success: false, order: null };
     errorMessage.value = 'Ошибка при создании заказа';
   }
 };
+
 const startPaymentStatusCheck = (uuid: string) => {
   checkStatusInterval.value = window.setInterval(async () => {
     try {
