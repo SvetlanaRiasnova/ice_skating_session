@@ -498,17 +498,18 @@ const completeOrder = async () => {
 
     if (isTelegram.value) {
       paymentUrl = paymentUrl.replace(
-        'yoomoney.ru/checkout/payments/v2/contract',
-        'telegram-payments.yoomoney.ru'
+        'https://yoomoney.ru/checkout/payments/v2/contract',
+        'https://telegram-payments.yoomoney.ru'
       );
     }
-    
+
     if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
       window.Telegram.WebApp.openInvoice(paymentUrl, (status: string) => {
-        if (status === 'success === true') {
+        if (status === 'success') {
           paymentStatus.value = { loading: false, success: true, order: response };
         } else {
           paymentStatus.value = { loading: false, success: false, order: null };
+          errorMessage.value = 'Ошибка при оплате заказа';
         }
       });
     } else {
@@ -521,7 +522,6 @@ const completeOrder = async () => {
     errorMessage.value = 'Ошибка при создании заказа';
   }
 };
-
 const startPaymentStatusCheck = (uuid: string) => {
   checkStatusInterval.value = window.setInterval(async () => {
     try {
