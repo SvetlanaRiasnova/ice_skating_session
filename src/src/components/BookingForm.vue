@@ -11,39 +11,6 @@ declare global {
         version?: string;
         platform?: string;
         isExpanded?: boolean;
-        expand?: () => void;
-        ready?: () => void;
-        MainButton?: {
-          text?: string;
-          color?: string;
-          textColor?: string;
-          isVisible?: boolean;
-          isActive?: boolean;
-          setText?: (text: string) => void;
-          onClick?: (callback: () => void) => void;
-          offClick?: (callback: () => void) => void;
-          show?: () => void;
-          hide?: () => void;
-          enable?: () => void;
-          disable?: () => void;
-          showProgress?: (leaveActive?: boolean) => void;
-          hideProgress?: () => void;
-        };
-        BackButton?: {
-          isVisible?: boolean;
-          onClick?: (callback: () => void) => void;
-          offClick?: (callback: () => void) => void;
-          show?: () => void;
-          hide?: () => void;
-        };
-        HapticFeedback?: {
-          impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
-          notificationOccurred?: (type: 'error' | 'success' | 'warning') => void;
-          selectionChanged?: () => void;
-        };
-        showAlert?: (message: string, callback?: () => void) => void;
-        showConfirm?: (message: string, callback?: (confirmed: boolean) => void) => void;
-        close?: () => void;
       };
     };
   }
@@ -67,7 +34,6 @@ interface SessionDetails {
   date: string;
   times: SessionTime[];
 }
-
 interface Promotion {
   id: number;
   title: string;
@@ -86,18 +52,14 @@ interface ApiError {
     };
   };
 }
-
 type FilterType = '' | 'nearest' | 'weekend' | 'custom';
-
 function isApiError(error: unknown): error is ApiError {
   return typeof error === 'object' && error !== null && 'response' in error;
 }
 
-// Telegram Web App состояние
 const isTelegram = ref(false);
-const tgWebApp = ref<any>(null);
+// const tgWebApp = ref<any>(null);
 const initData = ref<string>('');
-const isTelegramReady = ref(false);
 
 const paymentStatus = ref({
   loading: false,
@@ -130,7 +92,7 @@ const promoCodeDetails = ref<{
   percentage_check: string;
 } | null>(null);
 const totalCost = ref(0);
-const originalCost = ref(0);
+const originalCost = ref(0); // Базовая стоимость без скидок
 const isReviewMode = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
@@ -145,7 +107,6 @@ const selectedPromotions = ref<number[]>([]);
 const showPromotionModal = ref(false);
 const currentPromotion = ref<Promotion | null>(null);
 
-// Telegram Web App методы
 const checkTelegramWebApp = (): boolean => {
   try {
     return (
@@ -154,165 +115,15 @@ const checkTelegramWebApp = (): boolean => {
       window.Telegram?.WebApp?.platform !== 'unknown'
     );
   } catch (e) {
-    console.error('Ошибка при проверке Telegram WebApp:', e);
     return false;
   }
 };
 
-const initTelegramWebApp = async () => {
-  if (!checkTelegramWebApp()) {
-    console.log('Telegram WebApp недоступен');
-    return;
-  }
-
-  try {
-    tgWebApp.value = window.Telegram?.WebApp;
-    
-    if (tgWebApp.value) {
-      // Сообщаем Telegram, что приложение готово
-      tgWebApp.value.ready?.();
-      isTelegramReady.value = true;
-      
-      // Разворачиваем приложение на весь экран
-      if (!tgWebApp.value.isExpanded) {
-        tgWebApp.value.expand?.();
-      }
-      
-      // Получаем initData
-      initData.value = tgWebApp.value.initData || '';
-      console.log('InitData получен:', initData.value ? 'Да' : 'Нет');
-      
-      // Настройка главной кнопки
-      setupMainButton();
-      
-      // Настройка кнопки "Назад"
-      setupBackButton();
-      
-      // Включение тактильной обратной связи
-      enableHapticFeedback();
-      
-      console.log('Telegram WebApp успешно инициализирован');
-    }
-  } catch (error) {
-    console.error('Ошибка инициализации Telegram WebApp:', error);
-  }
-};
-
-const setupMainButton = () => {
-  if (!tgWebApp.value?.MainButton) return;
-  
-  const mainButton = tgWebApp.value.MainButton;
-  
-  // Настройки кнопки
-  mainButton.color = '#064594';
-  mainButton.textColor = '#FFFFFF';
-  
-  // Скрываем кнопку по умолчанию
-  mainButton.hide?.();
-};
-
-const setupBackButton = () => {
-  if (!tgWebApp.value?.BackButton) return;
-  
-  const backButton = tgWebApp.value.BackButton;
-  
-  // Обработчик кнопки "Назад"
-  const handleBackButton = () => {
-    if (isReviewMode.value) {
-      cancelReview();
-    } else if (sessionId.value) {
-      // Возврат к выбору сеансов
-      sessionId.value = null;
-      selectedTimes.value = [];
-      selectedTimeId.value = null;
-      sessionDetails.value = null;
-    }
-    
-    // Тактильная обратная связь
-    tgWebApp.value?.HapticFeedback?.selectionChanged?.();
-  };
-  
-  backButton.onClick?.(handleBackButton);
-};
-
-const enableHapticFeedback = () => {
-  // Тактильная обратная связь будет использоваться в различных действиях
-  console.log('Тактильная обратная связь включена');
-};
-
-const showMainButton = (text: string, onClick: () => void) => {
-  if (!tgWebApp.value?.MainButton) return;
-  
-  const mainButton = tgWebApp.value.MainButton;
-  
-  // Удаляем предыдущие обработчики
-  mainButton.offClick?.(onClick);
-  
-  // Устанавливаем новый текст и обработчик
-  mainButton.setText?.(text);
-  mainButton.onClick?.(onClick);
-  mainButton.enable?.();
-  mainButton.show?.();
-};
-
-const hideMainButton = () => {
-  if (!tgWebApp.value?.MainButton) return;
-  tgWebApp.value.MainButton.hide?.();
-};
-
-const showBackButton = () => {
-  if (!tgWebApp.value?.BackButton) return;
-  tgWebApp.value.BackButton.show?.();
-};
-
-const hideBackButton = () => {
-  if (!tgWebApp.value?.BackButton) return;
-  tgWebApp.value.BackButton.hide?.();
-};
-
-const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'error' | 'warning' | 'selection') => {
-  if (!tgWebApp.value?.HapticFeedback) return;
-  
-  const haptic = tgWebApp.value.HapticFeedback;
-  
-  switch (type) {
-    case 'light':
-    case 'medium':
-    case 'heavy':
-      haptic.impactOccurred?.(type);
-      break;
-    case 'success':
-    case 'error':
-    case 'warning':
-      haptic.notificationOccurred?.(type);
-      break;
-    case 'selection':
-      haptic.selectionChanged?.();
-      break;
-  }
-};
-
-const showTelegramAlert = (message: string): Promise<void> => {
-  return new Promise((resolve) => {
-    if (tgWebApp.value?.showAlert) {
-      tgWebApp.value.showAlert(message, () => resolve());
-    } else {
-      alert(message);
-      resolve();
-    }
-  });
-};
-
-onMounted(async () => {
+onMounted(() => {
   isTelegram.value = checkTelegramWebApp();
   console.log('isTelegram:', isTelegram.value);
-  
-  if (isTelegram.value) {
-    await initTelegramWebApp();
-  }
 });
 
-// Вычисляемые свойства
 const showPenguinsNeeds = computed(() => children.value > 0);
 const showPenguinsInput = computed(() => needPenguins.value);
 const showSkatesInput = computed(() => needSkates.value);
@@ -321,7 +132,6 @@ const selectedTime = computed(() => {
   return selectedTimes.value.find(time => time.id === selectedTimeId.value) || null;
 });
 
-// Валидация
 const validateName = (name: string): boolean => {
   if (!name.trim()) {
     nameError.value = 'Поле обязательно для заполнения';
@@ -344,7 +154,6 @@ const validatePhone = (phone: string): boolean => {
   return cleaned.length === 11 && (cleaned[0] === '7' || cleaned[0] === '8');
 };
 
-// Форматирование
 const formatDate = (dateString: string): string => {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -386,6 +195,7 @@ const handlePhoneBlur = () => {
 const normalizePhoneNumber = (phone: string): string => {
   let cleaned = phone.replace(/\D/g, '');
 
+  // Если номер начинается с 7, заменяем на 8
   if (cleaned.length > 0 && cleaned[0] === '7') {
     cleaned = '8' + cleaned.substring(1);
   }
@@ -393,7 +203,6 @@ const normalizePhoneNumber = (phone: string): string => {
   return cleaned.substring(0, 11);
 };
 
-// Загрузка данных
 async function loadSessions() {
   if (!filterType.value || (filterType.value === 'custom' && !customDate.value)) {
     errorMessage.value = filterType.value === 'custom' ? 'Пожалуйста, выберите дату' : '';
@@ -407,20 +216,10 @@ async function loadSessions() {
   try {
     sessions.value = await getSessions(filterType.value, customDate.value);
     await fetchPromotions();
-    
-    // Тактильная обратная связь при успешной загрузке
-    if (isTelegram.value) {
-      triggerHaptic('light');
-    }
   } catch (error) {
     console.error('Ошибка загрузки сеансов:', error);
     errorMessage.value = 'Не удалось загрузить сеансы. Попробуйте позже.';
     sessions.value = [];
-    
-    // Тактильная обратная связь при ошибке
-    if (isTelegram.value) {
-      triggerHaptic('error');
-    }
   } finally {
     isLoading.value = false;
   }
@@ -428,13 +227,6 @@ async function loadSessions() {
 
 const getDateTimes = async (session: Session) => {
   sessionId.value = session.id;
-  
-  // Тактильная обратная связь при выборе
-  if (isTelegram.value) {
-    triggerHaptic('selection');
-    showBackButton();
-  }
-  
   try {
     const details = await getSessionDetails(session.id);
     sessionDetails.value = details;
@@ -444,10 +236,6 @@ const getDateTimes = async (session: Session) => {
     console.error('Ошибка загрузки времени сеансов:', error);
     errorMessage.value = 'Не удалось загрузить доступное время';
     selectedTimes.value = [];
-    
-    if (isTelegram.value) {
-      triggerHaptic('error');
-    }
   }
 };
 
@@ -462,10 +250,6 @@ const fetchPromotions = async () => {
 const openPromotionModal = (promotion: Promotion) => {
   currentPromotion.value = promotion;
   showPromotionModal.value = true;
-  
-  if (isTelegram.value) {
-    triggerHaptic('light');
-  }
 };
 
 const isPromotionActive = (promotion: Promotion) => {
@@ -482,7 +266,7 @@ const isPromotionAdded = (promotionId: number) => {
   return selectedPromotions.value.includes(promotionId);
 };
 
-// Расчет стоимости
+// Универсальная функция для расчета стоимости
 const calculatePrice = async () => {
   if (!sessionId.value || !selectedTimeId.value) return;
 
@@ -498,12 +282,13 @@ const calculatePrice = async () => {
       user_phone: phoneNumber.value,
       promo_code: promoCodeApplied.value ? promoCode.value : null,
       promotions: selectedPromotions.value,
-      ...(isTelegram.value && initData.value && { InitData: initData.value })
+      ...(isTelegram.value && { InitData: initData.value })
     };
 
     const priceResult = await getOrderPrice(payload);
     totalCost.value = priceResult.price;
 
+    // Если нет скидок, то это базовая стоимость
     if (!promoCodeApplied.value && selectedPromotions.value.length === 0) {
       originalCost.value = priceResult.price;
     }
@@ -522,11 +307,7 @@ const togglePromotion = async (promotionId: number) => {
 
   showPromotionModal.value = false;
 
-  // Тактильная обратная связь
-  if (isTelegram.value) {
-    triggerHaptic('light');
-  }
-
+  // Пересчитываем стоимость после изменения акций
   if (sessionId.value && selectedTimeId.value) {
     await calculatePrice();
   }
@@ -542,16 +323,19 @@ const applyPromoCode = async () => {
 
   try {
     if (promoCodeApplied.value) {
+      // Сбрасываем промокод
       promoCodeInput.value = '';
       promoCode.value = '';
       promoCodeApplied.value = false;
       promoCodeDetails.value = null;
     } else {
+      // Применяем промокод
       if (!promoCodeInput.value.trim()) {
         promoCodeError.value = 'Введите промокод';
         return;
       }
 
+      // Проверяем валидность промокода
       try {
         const promoResponse = await checkPromoCode(promoCodeInput.value);
         promoCodeDetails.value = {
@@ -560,11 +344,6 @@ const applyPromoCode = async () => {
         };
         promoCodeApplied.value = true;
         promoCode.value = promoCodeInput.value;
-        
-        // Тактильная обратная связь при успехе
-        if (isTelegram.value) {
-          triggerHaptic('success');
-        }
       } catch (error) {
         if (isApiError(error)) {
           promoCodeError.value = error.response?.status === 404
@@ -575,27 +354,19 @@ const applyPromoCode = async () => {
         } else {
           promoCodeError.value = 'Неизвестная ошибка при проверке промокода';
         }
-        
-        // Тактильная обратная связь при ошибке
-        if (isTelegram.value) {
-          triggerHaptic('error');
-        }
         return;
       }
     }
 
+    // Пересчитываем стоимость после изменения промокода
     await calculatePrice();
+
   } catch (error) {
     console.error('Ошибка:', error);
     promoCodeError.value = 'Ошибка при обработке промокода';
-    
-    if (isTelegram.value) {
-      triggerHaptic('error');
-    }
   }
 };
 
-// Обработка формы
 const handleSubmit = async (event: Event) => {
   event.preventDefault();
   checkboxError.value = '';
@@ -603,36 +374,25 @@ const handleSubmit = async (event: Event) => {
 
   if (!sessionId.value || (isTelegram.value && !selectedTimeId.value)) {
     errorMessage.value = 'Пожалуйста, выберите дату и время';
-    if (isTelegram.value) {
-      triggerHaptic('error');
-    }
     return;
   }
 
   if (!validateName(userName.value)) {
-    if (isTelegram.value) {
-      triggerHaptic('error');
-    }
     return;
   }
 
   if (!validatePhone(phoneNumber.value)) {
     phoneError.value = 'Введите корректный номер телефона (начинается с 7 или 8)';
-    if (isTelegram.value) {
-      triggerHaptic('error');
-    }
     return;
   }
 
   if (!agreement.value || !privacyPolicy.value) {
     checkboxError.value = 'Необходимо принять условия соглашения и политики конфиденциальности';
-    if (isTelegram.value) {
-      triggerHaptic('error');
-    }
     return;
   }
 
   try {
+    // Получаем базовую стоимость без скидок для отображения в превью
     const basePricePayload = {
       session: sessionId.value,
       session_time: selectedTimeId.value,
@@ -649,6 +409,7 @@ const handleSubmit = async (event: Event) => {
     const basePriceResult = await getOrderPrice(basePricePayload);
     originalCost.value = basePriceResult.price;
 
+    // Если есть применённые скидки, пересчитываем с ними
     if (promoCodeApplied.value || selectedPromotions.value.length > 0) {
       await calculatePrice();
     } else {
@@ -657,33 +418,17 @@ const handleSubmit = async (event: Event) => {
 
     isReviewMode.value = true;
     paymentStatus.value = { loading: false, success: null, order: null };
-    
-    // Показываем кнопку оплаты в Telegram
-    if (isTelegram.value) {
-      showMainButton('Перейти к оплате', completeOrder);
-      triggerHaptic('success');
-    }
   } catch (error) {
     console.error('Ошибка расчета стоимости:', error);
     errorMessage.value = 'Ошибка при расчете стоимости';
-    
-    if (isTelegram.value) {
-      triggerHaptic('error');
-    }
   }
 };
 
-// Обработка оплаты
 const completeOrder = async () => {
   if (!sessionId.value || !selectedTimeId.value) return;
 
   try {
     paymentStatus.value = { loading: true, success: null, order: null };
-    
-    // Показываем прогресс в главной кнопке
-    if (isTelegram.value) {
-      tgWebApp.value?.MainButton?.showProgress?.(false);
-    }
 
     const payload: Record<string, any> = {
       session: sessionId.value,
@@ -695,39 +440,21 @@ const completeOrder = async () => {
       user_name: userName.value,
       user_phone: normalizePhoneNumber(phoneNumber.value),
       promo_code: promoCodeApplied.value ? promoCode.value : null,
-      promotions: selectedPromotions.value.length > 0 ? selectedPromotions.value : [],
-      ...(isTelegram.value && initData.value && { InitData: initData.value })
+      promotions: selectedPromotions.value.length > 0 ? selectedPromotions.value : []
     };
 
     console.log('Отправляемые данные:', payload);
     const response = await createOrder(payload);
 
-    if (isTelegram.value && tgWebApp.value?.openInvoice) {
-      // Скрываем прогресс
-      tgWebApp.value.MainButton?.hideProgress?.();
-      hideMainButton();
-      
-      // Открываем счет для оплаты
-      tgWebApp.value.openInvoice(response.payment_url, (status: string) => {
-        console.log('Статус оплаты:', status);
-        
+    if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
+      window.Telegram.WebApp.openInvoice(response.payment_url, (status: string) => {
         if (status === 'paid') {
           paymentStatus.value = { loading: false, success: true, order: response };
-          triggerHaptic('success');
-          showMainButton('Вернуться к выбору сеанса', cancelReview);
-        } else if (status === 'cancelled') {
+        } else {
           paymentStatus.value = { loading: false, success: false, order: null };
-          triggerHaptic('error');
-          showMainButton('Попробовать снова', completeOrder);
-        } else if (status === 'failed') {
-          paymentStatus.value = { loading: false, success: false, order: null };
-          triggerHaptic('error');
-          showMainButton('Попробовать снова', completeOrder);
-          showTelegramAlert('Ошибка при оплате. Попробуйте еще раз.');
         }
       });
     } else {
-      // Для веб-версии
       paymentWindow.value = window.open(response.payment_url, '_blank');
       startPaymentStatusCheck(response.uuid);
     }
@@ -735,12 +462,6 @@ const completeOrder = async () => {
     console.error('Ошибка создания заказа:', error);
     paymentStatus.value = { loading: false, success: false, order: null };
     errorMessage.value = 'Ошибка при создании заказа';
-    
-    if (isTelegram.value) {
-      tgWebApp.value?.MainButton?.hideProgress?.();
-      triggerHaptic('error');
-      showTelegramAlert('Ошибка при создании заказа. Попробуйте еще раз.');
-    }
   }
 };
 
@@ -763,10 +484,6 @@ const startPaymentStatusCheck = (uuid: string) => {
 
 const resetPaymentStatus = () => {
   paymentStatus.value = { loading: false, success: null, order: null };
-  
-  if (isTelegram.value) {
-    hideMainButton();
-  }
 };
 
 const cancelReview = () => {
@@ -777,37 +494,15 @@ const cancelReview = () => {
   promoCode.value = '';
   promoCodeDetails.value = null;
   selectedPromotions.value = [];
-  
-  if (isTelegram.value) {
-    hideMainButton();
-    hideBackButton();
-    triggerHaptic('light');
-  }
 };
 
-// Обработчики выбора времени для Telegram
-const selectTime = (timeId: number) => {
-  if (isTelegram.value) {
-    selectedTimeId.value = timeId;
-    triggerHaptic('selection');
-  }
-};
-
-// Очистка ресурсов
 onUnmounted(() => {
   if (checkStatusInterval.value) {
     clearInterval(checkStatusInterval.value);
   }
   paymentWindow.value?.close();
-  
-  // Очищаем обработчики Telegram
-  if (isTelegram.value && tgWebApp.value) {
-    hideMainButton();
-    hideBackButton();
-  }
 });
 
-// Наблюдатели
 watch(filterType, (newVal) => {
   sessions.value = [];
   sessionId.value = null;
@@ -820,7 +515,7 @@ watch(customDate, (newVal) => {
   if (filterType.value === 'custom' && newVal) loadSessions();
 });
 
-// Автоматический пересчет стоимости
+// Добавляем наблюдатели для автоматического пересчета стоимости
 watch([adults, children, penguinsCount, skatesCount], () => {
   if (sessionId.value && selectedTimeId.value) {
     calculatePrice();
@@ -830,17 +525,6 @@ watch([adults, children, penguinsCount, skatesCount], () => {
 watch(selectedTimeId, (newVal) => {
   if (newVal && sessionId.value) {
     calculatePrice();
-  }
-});
-
-// Наблюдатель для режима просмотра (Telegram)
-watch(isReviewMode, (newVal) => {
-  if (isTelegram.value) {
-    if (newVal) {
-      showBackButton();
-    } else {
-      hideBackButton();
-    }
   }
 });
 </script>
@@ -872,8 +556,7 @@ watch(isReviewMode, (newVal) => {
 
             <ul v-if="sessionId === session.id && selectedTimes.length" class="time-list"
               :class="{ 'interactive': isTelegram }">
-              <li v-for="time in selectedTimes" :key="time.id" 
-                @click.stop="selectTime(time.id)"
+              <li v-for="time in selectedTimes" :key="time.id" @click.stop="isTelegram && (selectedTimeId = time.id)"
                 class="time-item" :class="{
                   'selected-time': isTelegram && (selectedTimeId === time.id),
                   'clickable': isTelegram
@@ -893,12 +576,10 @@ watch(isReviewMode, (newVal) => {
         <p v-else-if="filterType && !isLoading" class="no-sessions">
           {{ filterType === 'custom' ? 'На выбранную дату сеансов нет' : 'Расписания пока нет' }}
         </p>
+
       </template>
-      
-      <!-- Кнопка для веб-версии -->
       <div v-if="!isTelegram" class="button-tg">
-        <div class="button-tg__icon"> 
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div class="button-tg__icon"> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <g clip-path="url(#clip0_550_1277)">
               <path d="M15 10L11 14L17 20L21 4L3 11L7 13L9 19L12 15" stroke="#ffffff" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round" />
@@ -911,12 +592,13 @@ watch(isReviewMode, (newVal) => {
           </svg>
         </div>
         <a href="https://t.me/roomly_test_bot" target="_blank">
+
           Купить билеты
         </a>
       </div>
     </div>
 
-    <!-- Форма бронирования для веб-версии -->
+    <!-- Форма бронирования -->
     <form class="booking-form" @submit="handleSubmit" v-if="!isTelegram">
       <template v-if="isReviewMode">
         <!-- Блок подтверждения заказа -->
@@ -936,6 +618,7 @@ watch(isReviewMode, (newVal) => {
             <div>Дети: {{ children }}</div>
             <div v-if="penguinsCount > 0">Пингвины: {{ penguinsCount }}</div>
             <div v-if="skatesCount > 0">Коньки: {{ skatesCount }} пар</div>
+
             <div>Имя: {{ userName }}</div>
             <div>Телефон: {{ formatPhoneNumber(phoneNumber) }}</div>
             <div><strong>Базовая стоимость:</strong> {{ originalCost }} ₽</div>
@@ -1106,12 +789,16 @@ watch(isReviewMode, (newVal) => {
         <div class="form-group checkbox-group">
           <label class="checkbox-label">
             <input type="checkbox" v-model="privacyPolicy">
-            <span>Я согласен с <router-link to="/privacy-policy" @click.stop>Политикой конфиденциальности</router-link></span>
+            <span>Я согласен с <router-link to="/privacy-policy"  @click.stop>Политикой конфиденциальности</router-link></span>
           </label>
         </div>
 
         <div class="error-message form-error" v-if="checkboxError">
           {{ checkboxError }}
+        </div>
+
+        <div v-if="checkboxError && errorMessage" class="error-message form-error">
+          {{ errorMessage }}
         </div>
 
         <div v-if="errorMessage" class="error-message form-error">{{ errorMessage }}</div>
@@ -1121,282 +808,9 @@ watch(isReviewMode, (newVal) => {
       </template>
     </form>
 
-    <!-- Форма для Telegram -->
-    <div v-if="isTelegram" class="telegram-form">
-      <template v-if="isReviewMode">
-        <!-- Блок подтверждения заказа для Telegram -->
-        <div v-if="paymentStatus.loading" class="payment-loading">
-          <h2>Проверка оплаты...</h2>
-          <div class="spinner"></div>
-          <p>Пожалуйста, подождите...</p>
-        </div>
-
-        <template v-else-if="paymentStatus.success === null">
-          <h2>Подтверждение заказа</h2>
-          <div v-if="sessionDetails && selectedTime" class="order-summary telegram-summary">
-            <div class="summary-item">
-              <span class="label">Сеанс:</span>
-              <span class="value">№{{ sessionDetails.id }}</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Дата:</span>
-              <span class="value">{{ formatDate(sessionDetails.date) }}</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Время:</span>
-              <span class="value">{{ selectedTime.start_time }} - {{ selectedTime.end_time }}</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Взрослые:</span>
-              <span class="value">{{ adults }}</span>
-            </div>
-            <div class="summary-item" v-if="children > 0">
-              <span class="label">Дети:</span>
-              <span class="value">{{ children }}</span>
-            </div>
-            <div class="summary-item" v-if="penguinsCount > 0">
-              <span class="label">Пингвины:</span>
-              <span class="value">{{ penguinsCount }}</span>
-            </div>
-            <div class="summary-item" v-if="skatesCount > 0">
-              <span class="label">Коньки:</span>
-              <span class="value">{{ skatesCount }} пар</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Имя:</span>
-              <span class="value">{{ userName }}</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Телефон:</span>
-              <span class="value">{{ formatPhoneNumber(phoneNumber) }}</span>
-            </div>
-            
-            <div class="cost-breakdown">
-              <div class="summary-item">
-                <span class="label">Базовая стоимость:</span>
-                <span class="value">{{ originalCost }} ₽</span>
-              </div>
-              
-              <!-- Блок акций для Telegram -->
-              <div v-if="promotions.length > 0" class="promotions-section telegram-promotions">
-                <h3>Акции на выбранную дату</h3>
-                <div class="promotions-list">
-                  <div v-for="promotion in promotions.filter(p => isPromotionActive(p))" :key="promotion.id"
-                    class="promotion-item telegram-promotion" :class="{ 'added': isPromotionAdded(promotion.id) }">
-                    <div class="promotion-content">
-                      <div class="promotion-title">{{ promotion.title }}</div>
-                      <div class="promotion-discount">Скидка: {{ promotion.sum }} ₽</div>
-                    </div>
-                    <div class="promotion-actions">
-                      <button type="button" class="promotion-details telegram-btn-sm" @click="openPromotionModal(promotion)">
-                        Подробнее
-                      </button>
-                      <button type="button" class="promotion-toggle telegram-btn-sm" @click="togglePromotion(promotion.id)">
-                        {{ isPromotionAdded(promotion.id) ? 'Удалить' : 'Добавить' }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Блок промокода для Telegram -->
-              <div class="promo-code-section telegram-promo">
-                <h3>Промокод</h3>
-                <div class="promo-code-input-group telegram-input-group">
-                  <input type="text" v-model="promoCodeInput" placeholder="Введите промокод" 
-                    :disabled="promoCodeApplied" class="telegram-input">
-                  <button type="button" @click="applyPromoCode" class="telegram-btn-sm">
-                    {{ promoCodeApplied ? 'Сбросить' : 'Применить' }}
-                  </button>
-                </div>
-                
-                <div v-if="promoCodeError" class="error-message telegram-error">
-                  {{ promoCodeError }}
-                </div>
-                
-                <div v-if="promoCodeDetails" class="promo-code-success telegram-success">
-                  Скидка: {{ promoCodeDetails.sum }} ₽
-                </div>
-              </div>
-              
-              <div class="summary-item total">
-                <span class="label">Итого:</span>
-                <span class="value total-value">{{ totalCost }} ₽</span>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <template v-else-if="paymentStatus.success">
-          <div class="success-screen">
-            <div class="success-icon">✅</div>
-            <h2>Заказ оплачен!</h2>
-            <div class="order-details telegram-success-details">
-              <div class="detail-item">
-                <span class="label">Номер заказа:</span>
-                <span class="value">{{ paymentStatus.order.id }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="label">Пин-код:</span>
-                <span class="value pin-code">{{ paymentStatus.order.pin }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="label">Дата:</span>
-                <span class="value">{{ formatDate(paymentStatus.order.date) }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="label">Время:</span>
-                <span class="value">{{ paymentStatus.order.time }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="label">Количество человек:</span>
-                <span class="value">{{ paymentStatus.order.people_count }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="label">Стоимость:</span>
-                <span class="value">{{ paymentStatus.order.price }} ₽</span>
-              </div>
-            </div>
-            
-            <div v-if="paymentStatus.order.promotions?.length" class="applied-promotions telegram-applied">
-              <h3>Применённые акции:</h3>
-              <ul>
-                <li v-for="promotion in paymentStatus.order.promotions" :key="promotion.id">
-                  {{ promotion.title }}
-                </li>
-              </ul>
-            </div>
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="error-screen">
-            <div class="error-icon">❌</div>
-            <h2>Ошибка оплаты</h2>
-            <p>Произошла ошибка при обработке платежа</p>
-          </div>
-        </template>
-      </template>
-
-      <template v-else>
-        <!-- Основная форма для Telegram -->
-        <div v-if="sessionDetails && selectedTime" class="current-session telegram-session">
-          <div class="session-info">
-            <div class="session-title">Сеанс №{{ sessionDetails.id }}</div>
-            <div class="session-datetime">{{ formatDate(sessionDetails.date) }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}</div>
-          </div>
-        </div>
-
-        <div class="telegram-form-content" v-if="sessionId && selectedTimeId">
-          <div class="form-section">
-            <h3>Количество участников</h3>
-            
-            <div class="counter-group">
-              <label>Взрослые (от 11 лет)</label>
-              <div class="counter">
-                <button type="button" @click="adults = Math.max(1, adults - 1)" class="counter-btn">-</button>
-                <span class="counter-value">{{ adults }}</span>
-                <button type="button" @click="adults++" class="counter-btn">+</button>
-              </div>
-            </div>
-            
-            <div class="counter-group">
-              <label>Дети (до 11 лет)</label>
-              <div class="counter">
-                <button type="button" @click="children = Math.max(0, children - 1)" class="counter-btn">-</button>
-                <span class="counter-value">{{ children }}</span>
-                <button type="button" @click="children++" class="counter-btn">+</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-section" v-if="showPenguinsNeeds">
-            <div class="checkbox-group telegram-checkbox">
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="needPenguins">
-                <span>Нужны пингвины для детей?</span>
-              </label>
-            </div>
-            
-            <div v-if="showPenguinsInput" class="counter-group">
-              <label>Количество пингвинов</label>
-              <div class="counter">
-                <button type="button" @click="penguinsCount = Math.max(0, penguinsCount - 1)" class="counter-btn">-</button>
-                <span class="counter-value">{{ penguinsCount }}</span>
-                <button type="button" @click="penguinsCount = Math.min(children, penguinsCount + 1)" class="counter-btn">+</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-section">
-            <div class="checkbox-group telegram-checkbox">
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="needSkates">
-                <span>Нужна аренда коньков?</span>
-              </label>
-            </div>
-            
-            <div v-if="showSkatesInput" class="counter-group">
-              <label>Количество пар коньков</label>
-              <div class="counter">
-                <button type="button" @click="skatesCount = Math.max(0, skatesCount - 1)" class="counter-btn">-</button>
-                <span class="counter-value">{{ skatesCount }}</span>
-                <button type="button" @click="skatesCount++" class="counter-btn">+</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-section">
-            <h3>Контактные данные</h3>
-            
-            <div class="input-group">
-              <label>Ваше имя</label>
-              <input type="text" v-model="userName" @blur="validateName(userName)" 
-                class="telegram-input" placeholder="Введите ваше имя">
-              <div class="error-message telegram-error" v-if="nameError">{{ nameError }}</div>
-            </div>
-
-            <div class="input-group">
-              <label>Номер телефона</label>
-              <input type="tel" :value="formatPhoneNumber(phoneNumber)" @input="handlePhoneInput" @blur="handlePhoneBlur"
-                placeholder="+7 (___) ___-__-__" class="telegram-input">
-              <div class="error-message telegram-error" v-if="phoneError">{{ phoneError }}</div>
-            </div>
-          </div>
-
-          <div class="form-section">
-            <div class="checkbox-group telegram-checkbox">
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="agreement">
-                <span>Согласие на обработку персональных данных</span>
-              </label>
-            </div>
-
-            <div class="checkbox-group telegram-checkbox">
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="privacyPolicy">
-                <span>Согласие с политикой конфиденциальности</span>
-              </label>
-            </div>
-          </div>
-
-          <div v-if="checkboxError" class="error-message telegram-error form-error">
-            {{ checkboxError }}
-          </div>
-
-          <div v-if="errorMessage" class="error-message telegram-error form-error">{{ errorMessage }}</div>
-
-          <!-- Кнопка оформления для Telegram (показывается только если MainButton недоступен) -->
-          <button v-if="!tgWebApp?.MainButton" type="button" @click="handleSubmit" class="telegram-submit-btn">
-            Оформить заказ
-          </button>
-        </div>
-      </template>
-    </div>
-
     <!-- Модальное окно акции -->
     <div v-if="showPromotionModal && currentPromotion" class="modal-overlay" @click.self="showPromotionModal = false">
-      <div class="modal-content" :class="{ 'telegram-modal': isTelegram }">
+      <div class="modal-content">
         <button class="close-button" @click="showPromotionModal = false">×</button>
 
         <h2>{{ currentPromotion.title }}</h2>
@@ -1423,7 +837,6 @@ watch(isReviewMode, (newVal) => {
     </div>
   </div>
 </template>
-
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
 
