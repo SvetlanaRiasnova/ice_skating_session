@@ -495,18 +495,18 @@ const completeOrder = async () => {
     console.log('Отправляемые данные:', payload);
     const response = await createOrder(payload);
 
-    // Всегда открываем в новом окне браузера
-    paymentWindow.value = window.open(response.payment_url, '_blank');
-    
-    if (!paymentWindow.value) {
-      errorMessage.value = 'Пожалуйста, разрешите всплывающие окна для оплаты';
-      paymentStatus.value = { loading: false, success: false, order: null };
-      return;
-    }
-
-    // Начинаем проверку статуса платежа
-    startPaymentStatusCheck(response.uuid);
-
+    // if (isTelegram.value && window.Telegram?.WebApp?.openInvoice) {
+    //   window.Telegram.WebApp.openInvoice(response.payment_url, (status: string) => {
+    //     if (status === 'paid') {
+    //       paymentStatus.value = { loading: false, success: true, order: response };
+    //     } else {
+    //       paymentStatus.value = { loading: false, success: false, order: null };
+    //     }
+    //   });
+    // } else {
+      paymentWindow.value = window.open(response.payment_url, '_blank');
+      startPaymentStatusCheck(response.uuid);
+    // }
   } catch (error) {
     console.error('Ошибка создания заказа:', error);
     paymentStatus.value = { loading: false, success: false, order: null };
