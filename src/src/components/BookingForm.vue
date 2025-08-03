@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions } from '../services/api';
+import PrivacyPolicyModal from './PrivacyPolicyModal.vue';
 
 declare global {
   interface Window {
@@ -115,6 +116,7 @@ const showPromotionModal = ref(false);
 const currentPromotion = ref<Promotion | null>(null);
 const showConfirmDialog = ref(false);
 const paymentUrl = ref('');
+const showPolicyModal = ref(false);
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -136,15 +138,15 @@ const initTelegramWebApp = async () => {
 
   try {
     tgWebApp.value = window.Telegram?.WebApp;
-    
+
     if (tgWebApp.value) {
       tgWebApp.value.ready?.();
       isTelegramReady.value = true;
-      
+
       if (!tgWebApp.value.isExpanded) {
         tgWebApp.value.expand?.();
       }
-      
+
       initData.value = tgWebApp.value.initData || '';
       console.log('Telegram WebApp успешно инициализирован');
     }
@@ -155,15 +157,14 @@ const initTelegramWebApp = async () => {
 
 onMounted(async () => {
   isTelegram.value = checkTelegramWebApp();
-  
+
   if (isTelegram.value) {
     await initTelegramWebApp();
   }
 
-  // Проверяем параметры URL после возврата из оплаты
   const urlParams = new URLSearchParams(window.location.search);
   const paymentUuid = urlParams.get('uuid');
-  
+
   if (paymentUuid) {
     checkPaymentStatusAfterReturn(paymentUuid);
   }
@@ -173,15 +174,14 @@ const checkPaymentStatusAfterReturn = async (uuid: string) => {
   try {
     paymentStatus.value = { loading: true, success: null, order: null };
     const status = await checkOrderStatus(uuid);
-    
+
     if (status.success) {
       paymentStatus.value = { loading: false, success: true, order: status.order };
       isReviewMode.value = true;
     } else {
       paymentStatus.value = { loading: false, success: false, order: null };
     }
-    
-    // Очищаем URL от параметров
+
     window.history.replaceState({}, document.title, window.location.pathname);
   } catch (error) {
     console.error('Ошибка проверки статуса платежа:', error);
@@ -295,7 +295,7 @@ const getDateTimes = async (session: Session) => {
     const details = await getSessionDetails(session.id);
     sessionDetails.value = details;
     selectedTimes.value = details.times;
-    selectedTimeId.value = isTelegram.value ? null : details.times[0]?.id || null;
+    selectedTimeId.value = null;
   } catch (error) {
     console.error('Ошибка загрузки времени сеансов:', error);
     errorMessage.value = 'Не удалось загрузить доступное время';
@@ -485,7 +485,7 @@ const openConfirmDialog = (url: string) => {
 
 const handleConfirm = () => {
   showConfirmDialog.value = false;
-  
+
   // Для iOS открываем через window.location
   if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     window.location.href = paymentUrl.value;
@@ -628,9 +628,9 @@ watch(selectedTimeId, (newVal) => {
 
             <ul v-if="sessionId === session.id && selectedTimes.length" class="time-list"
               :class="{ 'interactive': isTelegram }">
-              <li v-for="time in selectedTimes" :key="time.id" @click.stop="isTelegram && (selectedTimeId = time.id)"
+              <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id"
                 class="time-item" :class="{
-                  'selected-time': isTelegram && (selectedTimeId === time.id),
+                  'selected-time': selectedTimeId === time.id,
                   'clickable': isTelegram
                 }">
                 {{ time.start_time }} - {{ time.end_time }}
@@ -650,8 +650,9 @@ watch(selectedTimeId, (newVal) => {
         </p>
 
       </template>
-      <div v-if="!isTelegram" class="button-tg">
-        <div class="button-tg__icon"> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- <div v-if="!isTelegram" class="button-tg">
+        <div class="button-tg__icon"> <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
             <g clip-path="url(#clip0_550_1277)">
               <path d="M15 10L11 14L17 20L21 4L3 11L7 13L9 19L12 15" stroke="#ffffff" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round" />
@@ -667,7 +668,7 @@ watch(selectedTimeId, (newVal) => {
 
           Купить билеты
         </a>
-      </div>
+      </div> -->
     </div>
 
     <!-- Форма бронирования -->
@@ -861,7 +862,8 @@ watch(selectedTimeId, (newVal) => {
         <div class="form-group checkbox-group">
           <label class="checkbox-label">
             <input type="checkbox" v-model="privacyPolicy">
-            <span>Я согласен с <router-link to="/privacy-policy"  @click.stop>Политикой конфиденциальности</router-link></span>
+            <span>Я согласен с <a href="#" @click.prevent="showPolicyModal = true">Политикой
+                конфиденциальности</a></span>
           </label>
         </div>
 
@@ -885,7 +887,7 @@ watch(selectedTimeId, (newVal) => {
         <h3>Подтверждение оплаты</h3>
         <p>Вы будете перенаправлены на страницу оплаты ЮКассы.</p>
         <p>После завершения оплаты вы вернетесь обратно в приложение.</p>
-        
+
         <div class="form-actions">
           <button @click="handleConfirm" class="primary">Продолжить</button>
           <button @click="handleCancel" class="secondary">Отмена</button>
@@ -921,6 +923,7 @@ watch(selectedTimeId, (newVal) => {
       </div>
     </div>
   </div>
+  <PrivacyPolicyModal :showPolicyModal="showPolicyModal" @close="showPolicyModal = false" @click.self="showPolicyModal = false"/>
 </template>
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
@@ -1032,6 +1035,7 @@ watch(selectedTimeId, (newVal) => {
   color: #064594;
   border: 2px solid #064594;
   font-weight: 500;
+  box-sizing: border-box;
 }
 
 .availability {
@@ -1419,10 +1423,12 @@ button.secondary:hover {
   transition: background-color 0.2s;
   margin-top: 50px;
 }
+
 .button-tg__icon {
   width: 18px;
   height: 18px;
 }
+
 .button-tg a,
 .button-tg a:visited,
 .button-tg a:hover,
@@ -1431,6 +1437,7 @@ button.secondary:hover {
   color: #ffffff !important;
   font-weight: 500;
 }
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1453,6 +1460,7 @@ button.secondary:hover {
   max-height: 90vh;
   overflow-y: auto;
 }
+
 /* Блоки информации */
 .order-summary {
   margin-bottom: 20px;
