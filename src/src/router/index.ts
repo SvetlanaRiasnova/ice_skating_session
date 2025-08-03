@@ -5,8 +5,13 @@ const routes : Array<RouteRecordRaw> = [
     {
         path: '/',
         name: 'home', 
-        component: () => import('../App.vue') 
+        component: () => import('../components/BookingForm.vue') 
     },
+{
+  path: '/privacy-policy',
+  name: 'privacyPolicy', 
+  component: () => import('../components/PrivacyPolicyModal.vue') 
+}
 ]
 
 const router = createRouter(

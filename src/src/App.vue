@@ -4,7 +4,7 @@ import BookingForm from './components/BookingForm.vue';
 
 <template>
   <main class="container">
-    <BookingForm />
+    <router-view></router-view>
   </main>
 </template>
 
