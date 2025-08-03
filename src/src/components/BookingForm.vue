@@ -505,6 +505,13 @@ const completeOrder = async () => {
     //   });
     // } else {
       paymentWindow.value = window.open(response.payment_url, '_blank');
+
+       if (!paymentWindow.value) {
+      errorMessage.value = 'Пожалуйста, разрешите всплывающие окна для оплаты';
+      paymentStatus.value = { loading: false, success: false, order: null };
+      return;
+    }
+    
       startPaymentStatusCheck(response.uuid);
     // }
   } catch (error) {
