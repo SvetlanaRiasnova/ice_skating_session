@@ -1,8 +1,11 @@
 <template>
-    <div class="privacy-policy">
-        <div class="container">
+            <div class="modal-overlay" v-if="props.showPolicyModal">
+    <div class="modal-container">
+      
+      <div class="modal-content">
             <h1>Политика конфиденциальности</h1>
-            <p class="policy-date">Индивидуальный предприниматель<br>Август 2025 года</p>
+            <p class="policy-date">"УТВЕРЖДАЮ"</p>
+            <p class="policy-date">Индивидуальный предприниматель Мацук Елизавета Трофимовна<br>Август 2025 года</p>
 
             <div class="policy-section">
                 <h2>1. ОБЩИЕ ПОЛОЖЕНИЯ</h2>
@@ -217,7 +220,7 @@
                     <li>Выражаю полное и безоговорочное согласие на использование моих данных для поддержания связи со мной любым способом, включая телефонные звонки на указанный стационарный и/или мобильный телефон, отправку СМС-сообщений на указанный мобильный телефон, отправку электронных писем на указанный электронный адрес с целью информирования о поступлении новых товаров/услуг, оповещения о проводимых акциях, мероприятиях, скидках, их результатах. Для осуществления заочных опросов с целью изучения мнения о товарах/услугах, организациях торговли, высылки новостей и т.п. согласие предоставляется</li>
                 </ul>
                 <p>16.3. В данном документе будут отражены любые изменения политики обработки персональных данных Оператором. Политика действует бессрочно до замены ее новой версией.</p>
-                <p>16.4. Актуальная версия Политики в свободном доступе расположена в сети Интернет по адресу <a href="https://icemetr.ru/">https://icemetr.ru/</a>.</p>
+                <p>16.4. Актуальная версия Политики в свободном доступе расположена в сети Интернет по адресу <a href="https://icemetr.ru/" target="_blank">https://icemetr.ru/</a>.</p>
             </div>
 
             <div class="requisites">
@@ -230,107 +233,142 @@
                 <p>E-mail: <a href="mailto:arena@icemetr.ru">arena@icemetr.ru</a></p>
             </div>
 
-            <router-link to="/" class="back-button">Назад</router-link>
+           <div class="modal-footer">
+        <button @click="closeModal" class="primary">Закрыть</button>
+      </div>
         </div>
+    </div>
     </div>
 </template>
 
-<style>
-.privacy-policy {
-    font-family: 'Arial', sans-serif;
-    line-height: 1.6;
-    color: #333;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-    position: relative;
-    padding-bottom: 80px; /* Для кнопки */
+<script setup lang="ts">
+    import {defineProps, defineEmits } from 'vue';
+
+    const props = defineProps({
+        showPolicyModal: {
+            type: Boolean,
+             required: true
+        }
+    })
+
+    const emit = defineEmits(['close'])
+
+    const closeModal = () => {
+        emit('close');
+    }
+</script>
+
+<style scoped>
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 }
 
-.privacy-policy .container {
-    background: #fff;
-    padding: 30px;
-    border-radius: 5px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    position: relative;
+.modal-container {
+  background-color: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
-.privacy-policy h1 {
-    font-size: 28px;
-    color: #2c3e50;
-    margin-bottom: 10px;
-    text-align: center;
+.modal-content {
+  padding: 30px 30px 0 30px;
+  overflow-y: auto;
+  flex-grow: 1;
+  color: #064594;
+}
+
+.modal-footer {
+  padding: 15px 30px;
+  border-top: 1px solid #eee;
+  background: white;
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.primary {
+  background-color: #064594;
+  border: none;
+  padding: 10px 20px;
+  font-size: 16px;
+  text-decoration: none;
+  text-align: center;
+  color: #ffffff;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+h1 {
+  font-size: 24px;
+  margin-bottom: 15px;
+  text-align: center;
+  color: #064594;
+  font-weight: 700;
 }
 
 .policy-date {
-    text-align: center;
-    margin-bottom: 30px;
-    color: #666;
+  text-align: left;
+  margin-bottom: 25px;
+  margin: 0;
 }
 
-.privacy-policy h2 {
-    font-size: 20px;
-    color: #2c3e50;
-    margin: 25px 0 15px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #eee;
+h2 {
+  font-size: 16px;
+  margin: 25px 0 15px;
 }
 
-.privacy-policy h3 {
-    font-size: 18px;
-    color: #2c3e50;
-    margin: 20px 0 10px;
+p {
+  margin-bottom: 15px;
+  line-height: 1.6;
 }
 
-.privacy-policy p {
-    margin-bottom: 15px;
+ul {
+  margin-bottom: 15px;
+  padding-left: 20px;
 }
 
-.privacy-policy ul {
-    margin-bottom: 15px;
-    padding-left: 20px;
-}
-
-.privacy-policy ul li {
-    margin-bottom: 8px;
-}
-
-.privacy-policy a {
-    color: #3498db;
-    text-decoration: none;
-}
-
-.privacy-policy a:hover {
-    text-decoration: underline;
+ul li {
+  margin-bottom: 8px;
 }
 
 .requisites {
-    margin-top: 40px;
-    padding-top: 20px;
-    border-top: 1px solid #eee;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
 }
 
-.requisites p {
-    margin-bottom: 8px;
-}
-
-.back-button {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 12px 24px;
-    background-color: #3498db;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    text-decoration: none;
-    font-size: 16px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    transition: background-color 0.3s;
-}
-
-.back-button:hover {
-    background-color: #2980b9;
+@media (max-width: 768px) {
+  .modal-container {
+    width: 95%;
+    max-height: 85vh;
+  }
+  
+  .modal-content {
+    padding: 20px 20px 0 20px;
+  }
+  
+  h1 {
+    font-size: 20px;
+  }
+  
+  h2 {
+    font-size: 18px;
+  }
 }
 </style>

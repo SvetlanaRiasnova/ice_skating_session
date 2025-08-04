@@ -6,11 +6,13 @@ export async function fetchApi(
     params?: Record<string, string>;
   } = {}
 ) {
-  const baseUrl = "https://wo20h9-212-19-10-25.ru.tuna.am";
+
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+
+  // const baseUrl = "https://wo20h9-212-19-10-25.ru.tuna.am";
  
   let url = `${baseUrl}/${endpoint}`.replace(/([^:]\/)\/+/g, '$1');
  
-  // Добавляем параметры к URL
   if (options?.params) {
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(options.params)) {
@@ -39,16 +41,15 @@ export async function fetchApi(
     const response = await fetch(url, config);
    
     if (!response.ok) {
-      // Пытаемся получить данные об ошибке от сервера
+
       let errorData = null;
       try {
         errorData = await response.json();
       } catch {
-        // Если не удалось получить JSON, используем текст статуса
+
         errorData = { message: response.statusText };
       }
 
-      // Создаем ошибку в формате, который ожидает код
       const apiError = {
         response: {
           status: response.status,
@@ -61,12 +62,11 @@ export async function fetchApi(
 
     return await response.json();
   } catch (error) {
-    // Если это уже наша API ошибка, просто перебрасываем
+
     if (error && typeof error === 'object' && 'response' in error) {
       throw error;
     }
     
-    // Для других ошибок (сеть, парсинг и т.д.) оборачиваем в стандартный формат
     console.error('Fetch error:', error);
     throw {
       response: {

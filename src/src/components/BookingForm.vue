@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions } from '../services/api';
+import PrivacyPolicyModal from './PrivacyPolicyModal.vue';
+import { formatDate } from '../utils/dateFormatter';
+import { formatPhoneNumber, normalizePhoneNumber, validatePhone } from '../utils/phoneFormatter';
 
 declare global {
   interface Window {
@@ -115,6 +118,7 @@ const showPromotionModal = ref(false);
 const currentPromotion = ref<Promotion | null>(null);
 const showConfirmDialog = ref(false);
 const paymentUrl = ref('');
+const showPolicyModal = ref(false);
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -136,15 +140,15 @@ const initTelegramWebApp = async () => {
 
   try {
     tgWebApp.value = window.Telegram?.WebApp;
-    
+
     if (tgWebApp.value) {
       tgWebApp.value.ready?.();
       isTelegramReady.value = true;
-      
+
       if (!tgWebApp.value.isExpanded) {
         tgWebApp.value.expand?.();
       }
-      
+
       initData.value = tgWebApp.value.initData || '';
       console.log('Telegram WebApp успешно инициализирован');
     }
@@ -155,15 +159,14 @@ const initTelegramWebApp = async () => {
 
 onMounted(async () => {
   isTelegram.value = checkTelegramWebApp();
-  
+
   if (isTelegram.value) {
     await initTelegramWebApp();
   }
 
-  // Проверяем параметры URL после возврата из оплаты
   const urlParams = new URLSearchParams(window.location.search);
   const paymentUuid = urlParams.get('uuid');
-  
+
   if (paymentUuid) {
     checkPaymentStatusAfterReturn(paymentUuid);
   }
@@ -173,15 +176,14 @@ const checkPaymentStatusAfterReturn = async (uuid: string) => {
   try {
     paymentStatus.value = { loading: true, success: null, order: null };
     const status = await checkOrderStatus(uuid);
-    
+
     if (status.success) {
       paymentStatus.value = { loading: false, success: true, order: status.order };
       isReviewMode.value = true;
     } else {
       paymentStatus.value = { loading: false, success: false, order: null };
     }
-    
-    // Очищаем URL от параметров
+
     window.history.replaceState({}, document.title, window.location.pathname);
   } catch (error) {
     console.error('Ошибка проверки статуса платежа:', error);
@@ -214,30 +216,6 @@ const validateName = (name: string): boolean => {
   return true;
 };
 
-const validatePhone = (phone: string): boolean => {
-  const cleaned = phone.replace(/\D/g, '');
-  return cleaned.length === 11 && (cleaned[0] === '7' || cleaned[0] === '8');
-};
-
-const formatDate = (dateString: string): string => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('ru-RU');
-};
-
-const formatPhoneNumber = (value: string): string => {
-  let cleaned = value.replace(/\D/g, '');
-  if (cleaned.length > 0 && !['7', '8'].includes(cleaned[0])) {
-    cleaned = '7' + cleaned;
-  }
-  cleaned = cleaned.substring(0, 11);
-
-  const match = cleaned.match(/^(\d)(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
-  if (!match) return '';
-
-  return `+${match[1]}${match[2] ? ` (${match[2]}` : ''}${match[3] ? `) ${match[3]}` : ''}${match[4] ? `-${match[4]}` : ''}${match[5] ? `-${match[5]}` : ''}`;
-};
-
 const handlePhoneInput = (event: Event) => {
   const input = event.target as HTMLInputElement;
   let value = input.value.replace(/\D/g, '');
@@ -255,16 +233,6 @@ const handlePhoneBlur = () => {
     return;
   }
   phoneError.value = validatePhone(phoneNumber.value) ? '' : 'Введите корректный номер телефона (начинается с 7 или 8)';
-};
-
-const normalizePhoneNumber = (phone: string): string => {
-  let cleaned = phone.replace(/\D/g, '');
-
-  if (cleaned.length > 0 && cleaned[0] === '7') {
-    cleaned = '8' + cleaned.substring(1);
-  }
-
-  return cleaned.substring(0, 11);
 };
 
 async function loadSessions() {
@@ -295,7 +263,7 @@ const getDateTimes = async (session: Session) => {
     const details = await getSessionDetails(session.id);
     sessionDetails.value = details;
     selectedTimes.value = details.times;
-    selectedTimeId.value = isTelegram.value ? null : details.times[0]?.id || null;
+    selectedTimeId.value = null;
   } catch (error) {
     console.error('Ошибка загрузки времени сеансов:', error);
     errorMessage.value = 'Не удалось загрузить доступное время';
@@ -485,7 +453,7 @@ const openConfirmDialog = (url: string) => {
 
 const handleConfirm = () => {
   showConfirmDialog.value = false;
-  
+
   // Для iOS открываем через window.location
   if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     window.location.href = paymentUrl.value;
@@ -627,14 +595,14 @@ watch(selectedTimeId, (newVal) => {
             {{ formatDate(session.date) }}
 
             <ul v-if="sessionId === session.id && selectedTimes.length" class="time-list"
-              :class="{ 'interactive': isTelegram }">
-              <li v-for="time in selectedTimes" :key="time.id" @click.stop="isTelegram && (selectedTimeId = time.id)"
+              >
+              <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id"
                 class="time-item" :class="{
-                  'selected-time': isTelegram && (selectedTimeId === time.id),
+                  'selected-time': selectedTimeId === time.id,
                   'clickable': isTelegram
                 }">
                 {{ time.start_time }} - {{ time.end_time }}
-                <div class="availability" :class="{ 'selected': isTelegram && (selectedTimeId === time.id) }">
+                <div class="availability" :class="{ 'selected': selectedTimeId === time.id }">
                   <p>Мест: {{ time.available_places_count }}</p>
                   <p v-if="time.available_penguin_count !== undefined">
                     Пингвинов: {{ time.available_penguin_count }}
@@ -650,24 +618,6 @@ watch(selectedTimeId, (newVal) => {
         </p>
 
       </template>
-      <div v-if="!isTelegram" class="button-tg">
-        <div class="button-tg__icon"> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <g clip-path="url(#clip0_550_1277)">
-              <path d="M15 10L11 14L17 20L21 4L3 11L7 13L9 19L12 15" stroke="#ffffff" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round" />
-            </g>
-            <defs>
-              <clipPath id="clip0_550_1277">
-                <rect width="24" height="24" fill="white" />
-              </clipPath>
-            </defs>
-          </svg>
-        </div>
-        <a href="https://t.me/roomly_test_bot" target="_blank">
-
-          Купить билеты
-        </a>
-      </div>
     </div>
 
     <!-- Форма бронирования -->
@@ -746,11 +696,14 @@ watch(selectedTimeId, (newVal) => {
           </div>
 
           <div class="payment-rules">
-            <h3>Правила оплаты:</h3>
+            <h3>ВНИМАНИЕ! Прочтите до конца!</h3>
             <ol>
-              <li>Оплата производится онлайн банковской картой.</li>
-              <li>При отмене бронирования возврат средств возможен только в течение суток.</li>
-              <li>Указанные контактные данные необходимы для связи с вами.</li>
+              <li>Ознакомьтесь с правилами посещения Ледовой арены IceMETP<a href="#"></a></li>
+              <li>Оплачивая заказ Вы соглашаетесь с правилами посещения Ледовой арены IceMETP</li>
+              <li>На оплату заказа Вам дается 10 минут, иначе заказ будет отменен</li>
+              <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать ПИН-КОД, по которому Вы получите пропуск на арену</li>
+              <li>Вернуть билет можно не позднее чем за два часадо начала сеанса, лично обратившись в администрацию ледовой арены</li>
+              <li>Нажимая кнопку "Перейти к оплате", Вы подтверждаете, что ознакомились с правилами и согласны с ними.</li>
             </ol>
           </div>
 
@@ -817,7 +770,7 @@ watch(selectedTimeId, (newVal) => {
         <div class="form-group" v-if="showPenguinsNeeds">
           <label class="checkbox-label">
             <input type="checkbox" v-model="needPenguins">
-            <span>Требуется ли пингвин?</span>
+            <span>Требуется ли фигура-помощник "Пингвин" (для детей до 7 лет)?</span>
           </label>
         </div>
 
@@ -861,7 +814,8 @@ watch(selectedTimeId, (newVal) => {
         <div class="form-group checkbox-group">
           <label class="checkbox-label">
             <input type="checkbox" v-model="privacyPolicy">
-            <span>Я согласен с <router-link to="/privacy-policy"  @click.stop>Политикой конфиденциальности</router-link></span>
+            <span>Я согласен с <a href="#" class="policy-link" @click.prevent="showPolicyModal = true">Политикой
+                конфиденциальности</a></span>
           </label>
         </div>
 
@@ -885,7 +839,7 @@ watch(selectedTimeId, (newVal) => {
         <h3>Подтверждение оплаты</h3>
         <p>Вы будете перенаправлены на страницу оплаты ЮКассы.</p>
         <p>После завершения оплаты вы вернетесь обратно в приложение.</p>
-        
+
         <div class="form-actions">
           <button @click="handleConfirm" class="primary">Продолжить</button>
           <button @click="handleCancel" class="secondary">Отмена</button>
@@ -921,6 +875,7 @@ watch(selectedTimeId, (newVal) => {
       </div>
     </div>
   </div>
+  <PrivacyPolicyModal :showPolicyModal="showPolicyModal" @close="showPolicyModal = false" @click.self="showPolicyModal = false"/>
 </template>
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
@@ -930,12 +885,12 @@ watch(selectedTimeId, (newVal) => {
   color: #064594;
   max-width: 500px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 10px;
 }
 
 .booking-container.telegram {
   max-width: 100%;
-  padding: 15px;
+  padding: 10px;
 }
 
 /* Стили фильтра */
@@ -1017,21 +972,12 @@ watch(selectedTimeId, (newVal) => {
 
 }
 
-.time-list.interactive .time-item {
-  cursor: pointer;
-  background-color: #064594;
-  color: white;
-}
-
-.time-list.interactive .time-item:hover {
-  background-color: #043a7a;
-}
-
 .time-item.selected-time {
   background-color: white;
   color: #064594;
   border: 2px solid #064594;
   font-weight: 500;
+  box-sizing: border-box;
 }
 
 .availability {
@@ -1042,11 +988,6 @@ watch(selectedTimeId, (newVal) => {
   &.selected {
     color: #064594;
   }
-}
-
-.time-list.interactive .availability,
-.time-item.selected-time .availability {
-  color: white;
 }
 
 .time-item.selected-time .availability {
@@ -1106,6 +1047,11 @@ input[type="tel"] {
   width: auto;
 }
 
+.policy-link {
+  text-decoration: none;
+  color: #064594;
+  text-decoration: underline;
+}
 .error-message {
   color: #d32f2f;
   font-size: 0.8em;
@@ -1227,6 +1173,7 @@ input[type="tel"] {
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
+  max-width: 500px;
 }
 
 .close-button {
@@ -1238,14 +1185,21 @@ input[type="tel"] {
   font-size: 24px;
   cursor: pointer;
   color: #064594;
+  margin: 0; 
+  padding: 0; 
+  line-height: 1; 
+  width: 30px; 
+  height: 30px; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-
 .promotion-image {
   width: 100%;
   max-height: 200px;
-  object-fit: contain;
+  object-fit: cover;
   margin: 10px 0;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .promotion-dates {
@@ -1381,7 +1335,7 @@ button {
 button.primary {
   background-color: #064594;
   color: white;
-  margin-top: 20px;
+  /* margin-top: 20px; */
 }
 
 button.primary:hover {
@@ -1419,10 +1373,12 @@ button.secondary:hover {
   transition: background-color 0.2s;
   margin-top: 50px;
 }
+
 .button-tg__icon {
   width: 18px;
   height: 18px;
 }
+
 .button-tg a,
 .button-tg a:visited,
 .button-tg a:hover,
@@ -1431,6 +1387,7 @@ button.secondary:hover {
   color: #ffffff !important;
   font-weight: 500;
 }
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1453,6 +1410,7 @@ button.secondary:hover {
   max-height: 90vh;
   overflow-y: auto;
 }
+
 /* Блоки информации */
 .order-summary {
   margin-bottom: 20px;
@@ -1477,6 +1435,10 @@ button.secondary:hover {
 .payment-rules ol {
   padding-left: 20px;
   margin-top: 10px;
+}
+.payment-rules li {
+  padding-bottom: 10px;
+  font-size: 14px;
 }
 
 .order-success {
@@ -1515,6 +1477,7 @@ button.secondary:hover {
 .payment-loading {
   text-align: center;
   padding: 20px;
+  font-size: 14px;
 }
 
 .spinner {

@@ -7,11 +7,6 @@ const routes : Array<RouteRecordRaw> = [
         name: 'home', 
         component: () => import('../components/BookingForm.vue') 
     },
-{
-  path: '/privacy-policy',
-  name: 'privacyPolicy', 
-  component: () => import('../components/PrivacyPolicyModal.vue') 
-}
 ]
 
 const router = createRouter(
