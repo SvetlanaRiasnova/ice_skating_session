@@ -691,7 +691,7 @@ watch(selectedTimeId, (newVal) => {
             </div>
 
             <div class="total-cost">
-              <strong>Итого с учетом акций и скидок: {{ totalCost }} ₽</strong>
+              <strong>Итого <span class="total-cost__descr">(с учетом акций и скидок)</span>с учетом акций и скидок: {{ totalCost }} ₽</strong>
             </div>
           </div>
 
@@ -699,10 +699,10 @@ watch(selectedTimeId, (newVal) => {
             <h3>ВНИМАНИЕ! Прочтите до конца!</h3>
             <ol>
               <li>Ознакомьтесь с правилами посещения Ледовой арены IceMETP<a href="#"></a></li>
-              <li>Оплачивая заказ Вы соглашаетесь с правилами посещения Ледовой арены IceMETP</li>
+              <li>Оплачивая заказ Вы соглашаетесь с  <a href='https://icemetr.ru/rules' class="link">правилами посещения Ледовой арены IceMETP</a></li>
               <li>На оплату заказа Вам дается 10 минут, иначе заказ будет отменен</li>
               <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать ПИН-КОД, по которому Вы получите пропуск на арену</li>
-              <li>Вернуть билет можно не позднее чем за два часадо начала сеанса, лично обратившись в администрацию ледовой арены</li>
+              <li>Вернуть билет можно не позднее чем за два часа до начала сеанса, лично обратившись в администрацию ледовой арены</li>
               <li>Нажимая кнопку "Перейти к оплате", Вы подтверждаете, что ознакомились с правилами и согласны с ними.</li>
             </ol>
           </div>
@@ -728,14 +728,7 @@ watch(selectedTimeId, (newVal) => {
             <div><strong>Количество человек:</strong> {{ paymentStatus.order.people_count }}</div>
             <div><strong>Стоимость:</strong> {{ paymentStatus.order.price }} ₽</div>
           </div>
-          <div v-if="paymentStatus.order.promotions?.length" class="applied-promotions">
-            <h3>Применённые акции:</h3>
-            <ul>
-              <li v-for="promotion in paymentStatus.order.promotions" :key="promotion.id">
-                {{ promotion.title }}
-              </li>
-            </ul>
-          </div>
+
           <button type="button" @click="cancelReview" class="primary">
             Вернуться к выбору сеанса
           </button>
@@ -828,7 +821,7 @@ watch(selectedTimeId, (newVal) => {
         </div>
 
         <div v-if="errorMessage" class="error-message form-error">{{ errorMessage }}</div>
-        <button type="submit" class="primary">
+        <button type="submit" class="primary order-button">
           Оформить заказ
         </button>
       </template>
@@ -837,7 +830,7 @@ watch(selectedTimeId, (newVal) => {
     <div v-if="showConfirmDialog" class="modal-overlay">
       <div class="modal-content">
         <h3>Подтверждение оплаты</h3>
-        <p>Вы будете перенаправлены на страницу оплаты ЮКассы.</p>
+        <p>Вы будете перенаправлены на страницу оплаты.</p>
         <p>После завершения оплаты вы вернетесь обратно в приложение.</p>
 
         <div class="form-actions">
@@ -866,7 +859,7 @@ watch(selectedTimeId, (newVal) => {
         </div>
 
         <div class="promotion-discount">
-          Скидка: {{ currentPromotion.sum }} ₽
+          Стоимость: {{ currentPromotion.sum }} ₽
         </div>
 
         <button type="button" class="add-button" @click="togglePromotion(currentPromotion.id)">
@@ -900,11 +893,14 @@ watch(selectedTimeId, (newVal) => {
 
 .filter-select {
   width: 100%;
-  padding: 10px;
+  min-height: 50px;
+  padding: 10px 15px;
   border: 1px solid #064594;
   border-radius: 4px;
   background-color: #f5f9ff;
-  font-size: 1rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-top: 30px;
   margin-bottom: 15px;
   color: #064594;
 }
@@ -1040,6 +1036,7 @@ input[type="tel"] {
   display: flex;
   align-items: center;
   cursor: pointer;
+  gap: 8px;
 }
 
 .checkbox-label input {
@@ -1047,7 +1044,7 @@ input[type="tel"] {
   width: auto;
 }
 
-.policy-link {
+.policy-link, .link {
   text-decoration: none;
   color: #064594;
   text-decoration: underline;
@@ -1310,7 +1307,6 @@ input[type="tel"] {
   font-size: 0.9rem;
 }
 
-/* Адаптация для мобильных */
 @media (max-width: 480px) {
   .promo-code-input-group {
     flex-direction: column;
@@ -1326,16 +1322,17 @@ button {
   width: 100%;
   padding: 12px;
   border: none;
-  border-radius: 25px;
+  border-radius: 6px;
   font-weight: 500;
   cursor: pointer;
+  font-size: 1.1rem;
   transition: background-color 0.2s;
 }
 
 button.primary {
   background-color: #064594;
   color: white;
-  /* margin-top: 20px; */
+  margin-top: 20px;
 }
 
 button.primary:hover {
@@ -1356,38 +1353,6 @@ button.secondary:hover {
   margin-top: 20px;
 }
 
-.button-tg {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  text-decoration: none;
-  text-align: center;
-  color: #ffffff;
-  background-color: #064594;
-  padding: 12px;
-  border: none;
-  border-radius: 25px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  margin-top: 50px;
-}
-
-.button-tg__icon {
-  width: 18px;
-  height: 18px;
-}
-
-.button-tg a,
-.button-tg a:visited,
-.button-tg a:hover,
-.button-tg a:active {
-  text-decoration: none;
-  color: #ffffff !important;
-  font-weight: 500;
-}
-
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1399,6 +1364,7 @@ button.secondary:hover {
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  padding: 0 10px;
 }
 
 .modal-content {
@@ -1426,6 +1392,10 @@ button.secondary:hover {
   font-size: 1.1em;
   padding-top: 10px;
   border-top: 1px solid #d0e0ff;
+}
+
+.total-cost__descr {
+  font-size: 1rem;
 }
 
 .payment-rules {
@@ -1500,8 +1470,10 @@ button.secondary:hover {
   }
 }
 
-/* Адаптация для мобильных */
 @media (max-width: 480px) {
+  .filter-select {
+    font-size: 1rem;
+  }
   .booking-container {
     padding: 15px;
   }
