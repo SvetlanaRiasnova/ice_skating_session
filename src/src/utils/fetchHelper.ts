@@ -9,7 +9,6 @@ export async function fetchApi(
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
 
-  // const baseUrl = "https://bot.icemetr.ru:8443/";
  
   let url = `${baseUrl}/${endpoint}`.replace(/([^:]\/)\/+/g, '$1');
  
