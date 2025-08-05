@@ -371,16 +371,17 @@ const applyPromoCode = async () => {
         promoCodeApplied.value = true;
         promoCode.value = promoCodeInput.value;
       } catch (error) {
-        if (isApiError(error)) {
-          promoCodeError.value = error.response?.status === 404
-            ? 'Промокод недействителен или уже был использован'
-            : error.response?.data?.message || 'Ошибка при проверке промокода';
-        } else if (error instanceof Error) {
-          promoCodeError.value = error.message;
-        } else {
-          promoCodeError.value = 'Неизвестная ошибка при проверке промокода';
-        }
-        return;
+        console.log(error)
+        // if (isApiError(error)) {
+        //   promoCodeError.value = error.response?.status === 404
+        //     ? 'Промокод недействителен или уже был использован'
+        //     : error.response?.data?.message || 'Ошибка при проверке промокода';
+        // } else if (error instanceof Error) {
+        //   promoCodeError.value = error.message;
+        // } else {
+        //   promoCodeError.value = 'Неизвестная ошибка при проверке промокода';
+        // }
+        // return;
       }
     }
 
