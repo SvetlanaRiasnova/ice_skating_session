@@ -692,7 +692,7 @@ watch(selectedTimeId, (newVal) => {
             </div>
 
             <div class="total-cost">
-              <strong>Итого <span class="total-cost__descr">(с учетом акций и скидок)</span>с учетом акций и скидок: {{ totalCost }} ₽</strong>
+              <strong>Итого <span class="total-cost__descr">(с учетом акций и скидок)</span>: {{ totalCost }} ₽</strong>
             </div>
           </div>
 
