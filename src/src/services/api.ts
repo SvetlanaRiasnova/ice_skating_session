@@ -58,7 +58,7 @@ export async function checkOrderStatus(uuid: string) {
 
 export async function checkPromoCode(code: string): Promise<{ sum: number; percentage_check: string }> {
   return fetchApi(`api/v1/promo/`, {
-    params: { code: encodeURIComponent(code) },
+    params: { code: code },
     method: 'GET'
   });
 }
