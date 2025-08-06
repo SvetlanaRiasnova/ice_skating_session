@@ -2,6 +2,7 @@
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions } from '../services/api';
 import PrivacyPolicyModal from './PrivacyPolicyModal.vue';
+import RulesModal from './RulesModal.vue';
 import { formatDate } from '../utils/dateFormatter';
 import { formatPhoneNumber, normalizePhoneNumber, validatePhone } from '../utils/phoneFormatter';
 
@@ -119,6 +120,8 @@ const currentPromotion = ref<Promotion | null>(null);
 const showConfirmDialog = ref(false);
 const paymentUrl = ref('');
 const showPolicyModal = ref(false);
+const showRulesModal = ref(false);
+
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -396,6 +399,11 @@ const handleSubmit = async (event: Event) => {
   checkboxError.value = '';
   errorMessage.value = '';
 
+  if (!sessionId.value || !selectedTimeId.value) {
+    errorMessage.value = 'Пожалуйста, выберите дату и время';
+    return;
+  }
+  
   if (!sessionId.value || (isTelegram.value && !selectedTimeId.value)) {
     errorMessage.value = 'Пожалуйста, выберите дату и время';
     return;
@@ -586,7 +594,6 @@ watch(selectedTimeId, (newVal) => {
       </div>
 
       <div v-if="isLoading" class="loading-message">Загрузка сеансов...</div>
-      <div v-else-if="errorMessage" class="error-message">{{ errorMessage }}</div>
 
       <template v-else>
         <ul v-if="sessions.length > 0" class="session-list">
@@ -599,7 +606,6 @@ watch(selectedTimeId, (newVal) => {
               <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id"
                 class="time-item" :class="{
                   'selected-time': selectedTimeId === time.id,
-                  'clickable': isTelegram
                 }">
                 {{ time.start_time }} - {{ time.end_time }}
                 <div class="availability" :class="{ 'selected': selectedTimeId === time.id }">
@@ -698,11 +704,11 @@ watch(selectedTimeId, (newVal) => {
           <div class="payment-rules">
             <h3>ВНИМАНИЕ! Прочтите до конца!</h3>
             <ol>
-              <li>Ознакомьтесь с правилами посещения Ледовой арены IceMETP<a href="#"></a></li>
-              <li>Оплачивая заказ Вы соглашаетесь с  <a href='https://icemetr.ru/rules' class="link">правилами посещения Ледовой арены IceMETP</a></li>
-              <li>На оплату заказа Вам дается 10 минут, иначе заказ будет отменен</li>
-              <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать ПИН-КОД, по которому Вы получите пропуск на арену</li>
-              <li>Вернуть билет можно не позднее чем за два часа до начала сеанса, лично обратившись в администрацию ледовой арены</li>
+              <li>Ознакомьтесь с <a href='#'  class="link" @click.prevent="showRulesModal = true"><strong>правилами посещения Ледовой арены IceMETP</strong></a></li>
+              <li>Оплачивая заказ Вы соглашаетесь с  правилами посещения Ледовой арены IceMETP.</li>
+              <li>На оплату заказа Вам дается 10 минут, иначе заказ будет отменен.</li>
+              <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать ПИН-КОД, по которому Вы получите пропуск на арену.</li>
+              <li>Вернуть билет можно не позднее чем за два часа до начала сеанса, лично обратившись в администрацию ледовой арены.</li>
               <li>Нажимая кнопку "Перейти к оплате", Вы подтверждаете, что ознакомились с правилами и согласны с ними.</li>
             </ol>
           </div>
@@ -869,6 +875,7 @@ watch(selectedTimeId, (newVal) => {
     </div>
   </div>
   <PrivacyPolicyModal :showPolicyModal="showPolicyModal" @close="showPolicyModal = false" @click.self="showPolicyModal = false"/>
+  <RulesModal :showRules="showRulesModal" @close="showRulesModal = false" @click.self="showRulesModal = false"/>
 </template>
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
@@ -1395,10 +1402,11 @@ button.secondary:hover {
 }
 
 .total-cost__descr {
-  font-size: 1rem;
+  font-size: 0.8rem;
 }
 
 .payment-rules {
+  border-top: 1px solid #d0e0ff;
   margin: 20px 0;
 }
 
