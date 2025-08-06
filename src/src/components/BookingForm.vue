@@ -2,6 +2,7 @@
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions } from '../services/api';
 import PrivacyPolicyModal from './PrivacyPolicyModal.vue';
+import RulesModal from './RulesModal.vue';
 import { formatDate } from '../utils/dateFormatter';
 import { formatPhoneNumber, normalizePhoneNumber, validatePhone } from '../utils/phoneFormatter';
 
@@ -119,6 +120,8 @@ const currentPromotion = ref<Promotion | null>(null);
 const showConfirmDialog = ref(false);
 const paymentUrl = ref('');
 const showPolicyModal = ref(false);
+const showRulesModal = ref(false);
+
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -699,7 +702,7 @@ watch(selectedTimeId, (newVal) => {
             <h3>ВНИМАНИЕ! Прочтите до конца!</h3>
             <ol>
               <li>Ознакомьтесь с правилами посещения Ледовой арены IceMETP<a href="#"></a></li>
-              <li>Оплачивая заказ Вы соглашаетесь с  <a href='https://icemetr.ru/rules' target="_blank" class="link">правилами посещения Ледовой арены IceMETP</a></li>
+              <li>Оплачивая заказ Вы соглашаетесь с  <a href='#'  class="link" @click.prevent="showRulesModal = true">правилами посещения Ледовой арены IceMETP</a></li>
               <li>На оплату заказа Вам дается 10 минут, иначе заказ будет отменен</li>
               <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать ПИН-КОД, по которому Вы получите пропуск на арену</li>
               <li>Вернуть билет можно не позднее чем за два часа до начала сеанса, лично обратившись в администрацию ледовой арены</li>
@@ -869,6 +872,7 @@ watch(selectedTimeId, (newVal) => {
     </div>
   </div>
   <PrivacyPolicyModal :showPolicyModal="showPolicyModal" @close="showPolicyModal = false" @click.self="showPolicyModal = false"/>
+  <RulesModal :showRules="showRulesModal" @close="showRulesModal = false" />
 </template>
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
