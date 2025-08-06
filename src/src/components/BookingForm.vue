@@ -17,14 +17,6 @@ declare global {
         expand?: () => void;
         ready?: () => void;
         close?: () => void;
-        // Добавлено для BackButton
-        BackButton?: {
-          show: () => void;
-          hide: () => void;
-          onClick: (callback: () => void) => void;
-          offClick: (callback: () => void) => void;
-          isVisible?: boolean;
-        };
       };
     };
   }
@@ -140,52 +132,6 @@ const checkTelegramWebApp = (): boolean => {
   }
 };
 
-// Добавлена функция для обработки Back Button
-const handleBackButton = () => {
-  if (showPromotionModal.value) {
-    showPromotionModal.value = false;
-  } else if (showPolicyModal.value) {
-    showPolicyModal.value = false;
-  } else if (showConfirmDialog.value) {
-    handleCancel();
-  } else if (isReviewMode.value) {
-    cancelReview();
-  } else if (sessionId.value && selectedTimes.value.length > 0) {
-    // Сброс выбранного времени
-    selectedTimeId.value = null;
-    selectedTimes.value = [];
-    sessionDetails.value = null;
-    sessionId.value = null;
-  } else if (filterType.value) {
-    // Сброс фильтра
-    filterType.value = '';
-    customDate.value = '';
-    sessions.value = [];
-  } else {
-    // Закрытие приложения
-    tgWebApp.value?.close();
-  }
-};
-
-// Добавлена функция для управления видимостью Back Button
-const updateBackButton = () => {
-  if (!isTelegram.value || !tgWebApp.value?.BackButton) return;
-
-  const shouldShowBackButton = 
-    showPromotionModal.value || 
-    showPolicyModal.value || 
-    showConfirmDialog.value || 
-    isReviewMode.value || 
-    sessionId.value !== null || 
-    filterType.value !== '';
-
-  if (shouldShowBackButton) {
-    tgWebApp.value.BackButton.show();
-  } else {
-    tgWebApp.value.BackButton.hide();
-  }
-};
-
 const initTelegramWebApp = async () => {
   if (!checkTelegramWebApp()) {
     console.log('Telegram WebApp недоступен');
@@ -204,13 +150,6 @@ const initTelegramWebApp = async () => {
       }
 
       initData.value = tgWebApp.value.initData || '';
-      
-      // Добавлена инициализация Back Button
-      if (tgWebApp.value.BackButton) {
-        tgWebApp.value.BackButton.onClick(handleBackButton);
-        tgWebApp.value.BackButton.hide(); // Скрываем по умолчанию
-      }
-      
       console.log('Telegram WebApp успешно инициализирован');
     }
   } catch (error) {
@@ -603,11 +542,6 @@ onUnmounted(() => {
     clearInterval(checkStatusInterval.value);
   }
   paymentWindow.value?.close();
-  
-  // Добавлена очистка обработчика Back Button
-  if (isTelegram.value && tgWebApp.value?.BackButton) {
-    tgWebApp.value.BackButton.offClick(handleBackButton);
-  }
 });
 
 watch(filterType, (newVal) => {
@@ -632,11 +566,6 @@ watch(selectedTimeId, (newVal) => {
   if (newVal && sessionId.value) {
     calculatePrice();
   }
-});
-
-// Добавлены watchers для обновления состояния Back Button
-watch([showPromotionModal, showPolicyModal, showConfirmDialog, isReviewMode, sessionId, filterType], () => {
-  updateBackButton();
 });
 </script>
 
