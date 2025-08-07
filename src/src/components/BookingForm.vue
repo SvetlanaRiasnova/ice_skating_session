@@ -109,8 +109,6 @@ const isLoading = ref(false);
 const errorMessage = ref('');
 const penguinError = ref('');
 const scatesError = ref('');
-const ticketsCountErrorAdults = ref('');
-const ticketsCountErrorChildren = ref('');
 const agreement = ref(false);
 const privacyPolicy = ref(false);
 const nameError = ref('');
@@ -125,6 +123,7 @@ const showConfirmDialog = ref(false);
 const paymentUrl = ref('');
 const showPolicyModal = ref(false);
 const showRulesModal = ref(false);
+const ticketsExceeded = ref(false);
 
 
 const checkTelegramWebApp = (): boolean => {
@@ -206,35 +205,26 @@ const selectedTime = computed(() => {
   return selectedTimes.value.find(time => time.id === selectedTimeId.value) || null;
 });
 
-const validateTicketsAdults = () => {
-  if (adults.value + children.value > 10) {
-    ticketsCountErrorAdults.value = "В одном заказе может быть максимум 10 билетов";
-    return false;
-  } else {
-    ticketsCountErrorAdults.value = '';
-    return true
-  }
+const validateTickets = () => {
+  const total = adults.value + children.value;
+  ticketsExceeded.value = total > 10;
+  return !ticketsExceeded.value;
 }
 
-const validateTicketsChildren = () => {
-  if (adults.value + children.value > 10) {
-    ticketsCountErrorChildren.value = "В одном заказе может быть максимум 10 билетов";
-    return false;
-  } else {
-    ticketsCountErrorChildren.value = '';
-    return true
+// Вызываем валидацию при изменении полей
+watch([adults, children], () => {
+  validateTickets();
+  if (sessionId.value && selectedTimeId.value) {
+    calculatePrice();
   }
-}
+});
 
 const validateSkates = () => {
-  if (adults.value + children.value < skatesCount.value) {
+  if ((adults.value + children.value) < skatesCount.value) {
     scatesError.value = "Коньков не может быть больше, чем билетов";
     return false;
   }
-   else if ((children.value + adults.value) <= 10) {
-    penguinError.value = '';
-    return true;
-  }
+  
   else {
     scatesError.value = '';
     return true;
@@ -246,10 +236,7 @@ const validatePinguins = () => {
     penguinError.value = "Пингвинов не может быть больше, чем детских билетов";
     return false;
   }
-  else if ((children.value + adults.value) <= 10) {
-    penguinError.value = '';
-    return true;
-  }
+
   else {
     penguinError.value = '';
     return true;
@@ -859,17 +846,29 @@ watch(selectedTimeId, (newVal) => {
           Дата и время: {{ formatDate(sessionDetails.date) }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
         </div>
 
-        <div class="form-group">
-          <label>Взрослые (от 11 лет и старше)</label>
-          <input type="number" v-model.number="adults" min="0" @input="validateTicketsAdults" required>
-          <div class="error-message" v-if="ticketsCountErrorAdults">{{ ticketsCountErrorAdults }}</div>
-        </div>
+       <div class="form-group" :class="{ 'has-error': ticketsExceeded }">
+  <label>Взрослые (от 11 лет и старше)</label>
+  <input 
+    type="number" 
+    v-model.number="adults" 
+    min="0"
+    @blur="validateTickets"
+  >
+</div>
 
-        <div class="form-group">
-          <label>Дети (до 11 лет)</label>
-          <input type="number" v-model.number="children" min="0" @input="validateTicketsChildren" required>
-          <div class="error-message" v-if="ticketsCountErrorChildren && children">{{ ticketsCountErrorChildren }}</div>
-        </div>
+<div class="form-group" :class="{ 'has-error': ticketsExceeded }">
+  <label>Дети (до 11 лет)</label>
+  <input 
+    type="number" 
+    v-model.number="children" 
+    min="0"
+    @blur="validateTickets"
+  >
+</div>
+
+<div class="error-message" v-if="ticketsExceeded">
+  В одном заказе может быть максимум 10 билетов
+</div>
 
         <div class="form-group" v-if="showPenguinsNeeds">
           <label class="checkbox-label">
@@ -893,7 +892,7 @@ watch(selectedTimeId, (newVal) => {
 
         <div class="form-group" v-if="showSkatesInput">
           <label>Необходимое количество пар коньков</label>
-          <input type="number" v-model.number="skatesCount" min="0" :max="adults" required @blur="validateSkates">
+          <input type="number" v-model.number="skatesCount" min="0" :max="adults+children" required @blur="validateSkates">
           <div class="error-message" v-if="scatesError">{{ scatesError }}</div>
         </div>
 
@@ -1627,4 +1626,9 @@ button.secondary:hover {
     width: 100%;
   }
 }
+.has-error input {
+  border-color: 2px solid #d32f2f;
+  background-color: #ffebee;
+}
+
 </style>
