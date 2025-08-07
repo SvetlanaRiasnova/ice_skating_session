@@ -224,7 +224,7 @@ const validateSkates = () => {
     scatesError.value = "Коньков не может быть больше, чем билетов";
     return false;
   }
-  
+
   else {
     scatesError.value = '';
     return true;
@@ -366,7 +366,7 @@ const calculatePrice = async () => {
     if (!promoCodeApplied.value && selectedPromotions.value.length === 0) {
       originalCost.value = priceResult.price;
     }
- errorMessage.value = '';
+    errorMessage.value = '';
   } catch (error) {
     console.error('Ошибка расчета стоимости:', error);
     errorMessage.value = extractErrorMessage(error);
@@ -445,24 +445,24 @@ const extractErrorMessage = (error: any): string => {
     if (data.non_field_errors && Array.isArray(data.non_field_errors)) {
       return data.non_field_errors[0];
     }
-    
+
     if (data.message) {
       return data.message;
     }
 
-    const errorFields = Object.keys(data).filter(key => 
+    const errorFields = Object.keys(data).filter(key =>
       Array.isArray(data[key]) && data[key].length > 0
     );
-    
+
     if (errorFields.length > 0) {
-      return data[errorFields[0]][0]; 
+      return data[errorFields[0]][0];
     }
   }
 
   if (error?.message) {
     return error.message;
   }
-  
+
   return 'Произошла неожиданная ошибка';
 };
 
@@ -559,7 +559,7 @@ const completeOrder = async () => {
 
   try {
     paymentStatus.value = { loading: true, success: null, order: null };
-    errorMessage.value = ''; 
+    errorMessage.value = '';
 
     const payload: Record<string, any> = {
       session: sessionId.value,
@@ -587,7 +587,7 @@ const completeOrder = async () => {
       paymentWindow.value = window.open(response.payment_url, '_blank');
       startPaymentStatusCheck(response.uuid);
     }
-  }  catch (error) {
+  } catch (error) {
     console.error('Ошибка создания заказа:', error);
     paymentStatus.value = { loading: false, success: false, order: null };
     errorMessage.value = extractErrorMessage(error);
@@ -623,7 +623,7 @@ const cancelReview = () => {
   promoCode.value = '';
   promoCodeDetails.value = null;
   selectedPromotions.value = [];
- if (sessionId.value) {
+  if (sessionId.value) {
     getDateTimes({ id: sessionId.value, date: sessionDetails.value?.date || '' });
   }
 };
@@ -797,9 +797,9 @@ watch(selectedTimeId, (newVal) => {
               </li>
             </ol>
           </div>
-<div v-if="errorMessage" class="error-message form-error">
-  {{ errorMessage }}
-</div>
+          <div v-if="errorMessage" class="error-message form-error">
+            {{ errorMessage }}
+          </div>
           <div class="form-actions">
             <button type="button" @click="completeOrder" class="primary">
               Перейти к оплате
@@ -830,8 +830,8 @@ watch(selectedTimeId, (newVal) => {
         <template v-else>
           <h2>Ошибка оплаты</h2>
           <div v-if="errorMessage" class="error-message form-error">
-  {{ errorMessage }}
-</div>
+            {{ errorMessage }}
+          </div>
           <p>Произошла ошибка при обработке платежа. Пожалуйста, попробуйте еще раз.</p>
           <button type="button" @click="resetPaymentStatus" class="primary">
             Попробовать снова
@@ -846,29 +846,19 @@ watch(selectedTimeId, (newVal) => {
           Дата и время: {{ formatDate(sessionDetails.date) }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
         </div>
 
-       <div class="form-group" :class="{ 'has-error': ticketsExceeded }">
-  <label>Взрослые (от 11 лет и старше)</label>
-  <input 
-    type="number" 
-    v-model.number="adults" 
-    min="0"
-    @blur="validateTickets"
-  >
-</div>
+        <div class="form-group" :class="{ 'has-error': ticketsExceeded }">
+          <label>Взрослые (от 11 лет и старше)</label>
+          <input type="number" v-model.number="adults" min="0" @blur="validateTickets">
+        </div>
 
-<div class="form-group" :class="{ 'has-error': ticketsExceeded }">
-  <label>Дети (до 11 лет)</label>
-  <input 
-    type="number" 
-    v-model.number="children" 
-    min="0"
-    @blur="validateTickets"
-  >
-</div>
+        <div class="form-group" :class="{ 'has-error': ticketsExceeded }">
+          <label>Дети (до 11 лет)</label>
+          <input type="number" v-model.number="children" min="0" @blur="validateTickets">
+        </div>
 
-<div class="error-message" v-if="ticketsExceeded">
-  В одном заказе может быть максимум 10 билетов
-</div>
+        <div class="error-message" v-if="ticketsExceeded">
+          В одном заказе может быть максимум 10 билетов
+        </div>
 
         <div class="form-group" v-if="showPenguinsNeeds">
           <label class="checkbox-label">
@@ -892,7 +882,8 @@ watch(selectedTimeId, (newVal) => {
 
         <div class="form-group" v-if="showSkatesInput">
           <label>Необходимое количество пар коньков</label>
-          <input type="number" v-model.number="skatesCount" min="0" :max="adults+children" required @blur="validateSkates">
+          <input type="number" v-model.number="skatesCount" min="0" :max="adults + children" required
+            @blur="validateSkates">
           <div class="error-message" v-if="scatesError">{{ scatesError }}</div>
         </div>
 
@@ -1626,9 +1617,9 @@ button.secondary:hover {
     width: 100%;
   }
 }
+
 .has-error input {
   border-color: 2px solid #d32f2f;
   background-color: #ffebee;
 }
-
 </style>
