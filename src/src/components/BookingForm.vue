@@ -85,7 +85,7 @@ const sessionId = ref<number | null>(null);
 const selectedTimes = ref<SessionTime[]>([]);
 const selectedTimeId = ref<number | null>(null);
 const sessionDetails = ref<SessionDetails | null>(null);
-const adults = ref(1);
+const adults = ref(0);
 const children = ref(0);
 const needPenguins = ref(false);
 const penguinsCount = ref(0);
@@ -107,6 +107,10 @@ const originalCost = ref(0);
 const isReviewMode = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
+const penguinError = ref('');
+const scatesError = ref('');
+const ticketsCountErrorAdults = ref('');
+const ticketsCountErrorChildren = ref('');
 const agreement = ref(false);
 const privacyPolicy = ref(false);
 const nameError = ref('');
@@ -201,6 +205,56 @@ const showDatePicker = computed(() => filterType.value === 'custom');
 const selectedTime = computed(() => {
   return selectedTimes.value.find(time => time.id === selectedTimeId.value) || null;
 });
+
+const validateTicketsAdults = () => {
+  if (adults.value + children.value > 10) {
+    ticketsCountErrorAdults.value = "В одном заказе может быть максимум 10 билетов";
+    return false;
+  } else {
+    ticketsCountErrorAdults.value = '';
+    return true
+  }
+}
+
+const validateTicketsChildren = () => {
+  if (adults.value + children.value > 10) {
+    ticketsCountErrorChildren.value = "В одном заказе может быть максимум 10 билетов";
+    return false;
+  } else {
+    ticketsCountErrorChildren.value = '';
+    return true
+  }
+}
+
+const validateSkates = () => {
+  if (adults.value + children.value < skatesCount.value) {
+    scatesError.value = "Коньков не может быть больше, чем билетов";
+    return false;
+  }
+   else if ((children.value + adults.value) <= 10) {
+    penguinError.value = '';
+    return true;
+  }
+  else {
+    scatesError.value = '';
+    return true;
+  }
+}
+
+const validatePinguins = () => {
+  if (children.value < penguinsCount.value) {
+    penguinError.value = "Пингвинов не может быть больше, чем детских билетов";
+    return false;
+  }
+  else if ((children.value + adults.value) <= 10) {
+    penguinError.value = '';
+    return true;
+  }
+  else {
+    penguinError.value = '';
+    return true;
+  }
+}
 
 const validateName = (name: string): boolean => {
   if (!name.trim()) {
@@ -307,7 +361,7 @@ const calculatePrice = async () => {
   try {
     const payload = {
       session: sessionId.value,
-      session_time: selectedTimeId.value,
+      time: selectedTimeId.value,
       adult_count: adults.value,
       child_count: children.value,
       penguin_count: penguinsCount.value,
@@ -325,8 +379,10 @@ const calculatePrice = async () => {
     if (!promoCodeApplied.value && selectedPromotions.value.length === 0) {
       originalCost.value = priceResult.price;
     }
+ errorMessage.value = '';
   } catch (error) {
     console.error('Ошибка расчета стоимости:', error);
+    errorMessage.value = extractErrorMessage(error);
   }
 };
 
@@ -394,8 +450,39 @@ const applyPromoCode = async () => {
   }
 };
 
+const extractErrorMessage = (error: any): string => {
+
+  if (error?.response?.data) {
+    const data = error.response.data;
+
+    if (data.non_field_errors && Array.isArray(data.non_field_errors)) {
+      return data.non_field_errors[0];
+    }
+    
+    if (data.message) {
+      return data.message;
+    }
+
+    const errorFields = Object.keys(data).filter(key => 
+      Array.isArray(data[key]) && data[key].length > 0
+    );
+    
+    if (errorFields.length > 0) {
+      return data[errorFields[0]][0]; 
+    }
+  }
+
+  if (error?.message) {
+    return error.message;
+  }
+  
+  return 'Произошла неожиданная ошибка';
+};
+
 const handleSubmit = async (event: Event) => {
   event.preventDefault();
+  scatesError.value = '';
+  penguinError.value = '';
   checkboxError.value = '';
   errorMessage.value = '';
 
@@ -403,9 +490,14 @@ const handleSubmit = async (event: Event) => {
     errorMessage.value = 'Пожалуйста, выберите дату и время';
     return;
   }
-  
+
   if (!sessionId.value || (isTelegram.value && !selectedTimeId.value)) {
     errorMessage.value = 'Пожалуйста, выберите дату и время';
+    return;
+  }
+
+  if (!adults.value && !children.value) {
+    errorMessage.value = 'Пожалуйста, укажите количество билетов';
     return;
   }
 
@@ -426,7 +518,7 @@ const handleSubmit = async (event: Event) => {
   try {
     const basePricePayload = {
       session: sessionId.value,
-      session_time: selectedTimeId.value,
+      time: selectedTimeId.value,
       adult_count: adults.value,
       child_count: children.value,
       penguin_count: penguinsCount.value,
@@ -450,7 +542,7 @@ const handleSubmit = async (event: Event) => {
     paymentStatus.value = { loading: false, success: null, order: null };
   } catch (error) {
     console.error('Ошибка расчета стоимости:', error);
-    errorMessage.value = 'Ошибка при расчете стоимости';
+    errorMessage.value = extractErrorMessage(error);
   }
 };
 
@@ -480,6 +572,7 @@ const completeOrder = async () => {
 
   try {
     paymentStatus.value = { loading: true, success: null, order: null };
+    errorMessage.value = ''; 
 
     const payload: Record<string, any> = {
       session: sessionId.value,
@@ -507,10 +600,10 @@ const completeOrder = async () => {
       paymentWindow.value = window.open(response.payment_url, '_blank');
       startPaymentStatusCheck(response.uuid);
     }
-  } catch (error) {
+  }  catch (error) {
     console.error('Ошибка создания заказа:', error);
     paymentStatus.value = { loading: false, success: false, order: null };
-    errorMessage.value = 'Ошибка при создании заказа';
+    errorMessage.value = extractErrorMessage(error);
   }
 };
 
@@ -543,6 +636,9 @@ const cancelReview = () => {
   promoCode.value = '';
   promoCodeDetails.value = null;
   selectedPromotions.value = [];
+ if (sessionId.value) {
+    getDateTimes({ id: sessionId.value, date: sessionDetails.value?.date || '' });
+  }
 };
 
 onUnmounted(() => {
@@ -601,10 +697,9 @@ watch(selectedTimeId, (newVal) => {
             :class="{ 'selected': sessionId === session.id }">
             {{ formatDate(session.date) }}
 
-            <ul v-if="sessionId === session.id && selectedTimes.length" class="time-list"
-              >
-              <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id"
-                class="time-item" :class="{
+            <ul v-if="sessionId === session.id && selectedTimes.length" class="time-list">
+              <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id" class="time-item"
+                :class="{
                   'selected-time': selectedTimeId === time.id,
                 }">
                 {{ time.start_time }} - {{ time.end_time }}
@@ -644,8 +739,8 @@ watch(selectedTimeId, (newVal) => {
             <div>Время: {{ selectedTime.start_time }} - {{ selectedTime.end_time }}</div>
             <div>Взрослые: {{ adults }}</div>
             <div>Дети: {{ children }}</div>
-            <div v-if="penguinsCount > 0">Пингвины: {{ penguinsCount }}</div>
-            <div v-if="skatesCount > 0">Коньки: {{ skatesCount }} пар</div>
+            <div v-if="penguinsCount > 0">Пингвины: {{ penguinsCount }} (шт.)</div>
+            <div v-if="skatesCount > 0">Коньки: {{ skatesCount }} (п.)</div>
 
             <div>Имя: {{ userName }}</div>
             <div>Телефон: {{ formatPhoneNumber(phoneNumber) }}</div>
@@ -704,15 +799,20 @@ watch(selectedTimeId, (newVal) => {
           <div class="payment-rules">
             <h3>ВНИМАНИЕ! Прочтите до конца!</h3>
             <ol>
-              <li>Ознакомьтесь с <a href='#'  class="link" @click.prevent="showRulesModal = true"><strong>правилами посещения Ледовой арены IceMETP</strong></a></li>
-              <li>Оплачивая заказ Вы соглашаетесь с  правилами посещения Ледовой арены IceMETP.</li>
+              <li>Ознакомьтесь с <a href='#' class="link" @click.prevent="showRulesModal = true"><strong>правилами
+                    посещения Ледовой арены IceMETP</strong></a></li>
+              <li>Оплачивая заказ Вы соглашаетесь с правилами посещения Ледовой арены IceMETP.</li>
               <li>На оплату заказа Вам дается 10 минут, иначе заказ будет отменен.</li>
-              <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать ПИН-КОД, по которому Вы получите пропуск на арену.</li>
+              <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать ПИН-КОД, по которому
+                Вы получите пропуск на арену.</li>
               <li>Внимательно проверьте состав заказа, дату и время сеанса, так как билеты являются НЕВОЗВРАТНЫМИ!</li>
-              <li>Нажимая кнопку "Перейти к оплате", Вы подтверждаете, что ознакомились с правилами и согласны с ними.</li>
+              <li>Нажимая кнопку "Перейти к оплате", Вы подтверждаете, что ознакомились с правилами и согласны с ними.
+              </li>
             </ol>
           </div>
-
+<div v-if="errorMessage" class="error-message form-error">
+  {{ errorMessage }}
+</div>
           <div class="form-actions">
             <button type="button" @click="completeOrder" class="primary">
               Перейти к оплате
@@ -742,6 +842,9 @@ watch(selectedTimeId, (newVal) => {
 
         <template v-else>
           <h2>Ошибка оплаты</h2>
+          <div v-if="errorMessage" class="error-message form-error">
+  {{ errorMessage }}
+</div>
           <p>Произошла ошибка при обработке платежа. Пожалуйста, попробуйте еще раз.</p>
           <button type="button" @click="resetPaymentStatus" class="primary">
             Попробовать снова
@@ -758,12 +861,14 @@ watch(selectedTimeId, (newVal) => {
 
         <div class="form-group">
           <label>Взрослые (от 11 лет и старше)</label>
-          <input type="number" v-model.number="adults" min="1" required>
+          <input type="number" v-model.number="adults" min="0" @input="validateTicketsAdults" required>
+          <div class="error-message" v-if="ticketsCountErrorAdults">{{ ticketsCountErrorAdults }}</div>
         </div>
 
         <div class="form-group">
           <label>Дети (до 11 лет)</label>
-          <input type="number" v-model.number="children" min="0" required>
+          <input type="number" v-model.number="children" min="0" @input="validateTicketsChildren" required>
+          <div class="error-message" v-if="ticketsCountErrorChildren && children">{{ ticketsCountErrorChildren }}</div>
         </div>
 
         <div class="form-group" v-if="showPenguinsNeeds">
@@ -775,7 +880,8 @@ watch(selectedTimeId, (newVal) => {
 
         <div class="form-group" v-if="showPenguinsInput">
           <label>Необходимое количество пингвинов</label>
-          <input type="number" v-model.number="penguinsCount" min="0" :max="children" required>
+          <input type="number" v-model.number="penguinsCount" min="0" :max="children" required @blur="validatePinguins">
+          <div class="error-message" v-if="penguinError">{{ penguinError }}</div>
         </div>
 
         <div class="form-group">
@@ -787,7 +893,8 @@ watch(selectedTimeId, (newVal) => {
 
         <div class="form-group" v-if="showSkatesInput">
           <label>Необходимое количество пар коньков</label>
-          <input type="number" v-model.number="skatesCount" min="0" required>
+          <input type="number" v-model.number="skatesCount" min="0" :max="adults" required @blur="validateSkates">
+          <div class="error-message" v-if="scatesError">{{ scatesError }}</div>
         </div>
 
         <div class="form-group">
@@ -874,9 +981,11 @@ watch(selectedTimeId, (newVal) => {
       </div>
     </div>
   </div>
-  <PrivacyPolicyModal :showPolicyModal="showPolicyModal" @close="showPolicyModal = false" @click.self="showPolicyModal = false"/>
-  <RulesModal :showRules="showRulesModal" @close="showRulesModal = false" @click.self="showRulesModal = false"/>
+  <PrivacyPolicyModal :showPolicyModal="showPolicyModal" @close="showPolicyModal = false"
+    @click.self="showPolicyModal = false" />
+  <RulesModal :showRules="showRulesModal" @close="showRulesModal = false" @click.self="showRulesModal = false" />
 </template>
+
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
 
@@ -1051,11 +1160,13 @@ input[type="tel"] {
   width: auto;
 }
 
-.policy-link, .link {
+.policy-link,
+.link {
   text-decoration: none;
   color: #064594;
   text-decoration: underline;
 }
+
 .error-message {
   color: #d32f2f;
   font-size: 0.8em;
@@ -1189,15 +1300,16 @@ input[type="tel"] {
   font-size: 24px;
   cursor: pointer;
   color: #064594;
-  margin: 0; 
-  padding: 0; 
-  line-height: 1; 
-  width: 30px; 
-  height: 30px; 
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .promotion-image {
   width: 100%;
   max-height: 200px;
@@ -1414,6 +1526,7 @@ button.secondary:hover {
   padding-left: 20px;
   margin-top: 10px;
 }
+
 .payment-rules li {
   padding-bottom: 10px;
   font-size: 14px;
@@ -1482,6 +1595,7 @@ button.secondary:hover {
   .filter-select {
     font-size: 1rem;
   }
+
   .booking-container {
     padding: 15px;
   }
