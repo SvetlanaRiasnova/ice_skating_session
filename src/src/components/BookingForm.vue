@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
 import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions } from '../services/api';
+import AgreementModal from './AgreementModal.vue';
 import PrivacyPolicyModal from './PrivacyPolicyModal.vue';
 import RulesModal from './RulesModal.vue';
 import { formatDate } from '../utils/dateFormatter';
@@ -121,6 +122,7 @@ const showPromotionModal = ref(false);
 const currentPromotion = ref<Promotion | null>(null);
 const showConfirmDialog = ref(false);
 const paymentUrl = ref('');
+const showAgreementModal = ref(false);
 const showPolicyModal = ref(false);
 const showRulesModal = ref(false);
 const ticketsExceeded = ref(false);
@@ -721,7 +723,7 @@ watch(selectedTimeId, (newVal) => {
         <template v-else-if="paymentStatus.success === null">
           <h2>Предварительный просмотр заказа</h2>
           <div v-if="sessionDetails && selectedTime" class="order-summary">
-            <div><strong>Сеанс №{{ sessionDetails.id }}</strong></div>
+            <div><strong>Сеанс №{{ selectedTime.id }}</strong></div>
             <div>Дата: {{ formatDate(sessionDetails.date) }}</div>
             <div>Время: {{ selectedTime.start_time }} - {{ selectedTime.end_time }}</div>
             <div>Взрослые: {{ adults }}</div>
@@ -842,7 +844,7 @@ watch(selectedTimeId, (newVal) => {
       <template v-else>
         <!-- Основная форма -->
         <div v-if="sessionDetails && selectedTime" class="current-session">
-          <strong>Сеанс №{{ sessionDetails.id }}</strong><br>
+          <strong>Сеанс №{{ selectedTime.id }}</strong><br>
           Дата и время: {{ formatDate(sessionDetails.date) }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
         </div>
 
@@ -903,7 +905,7 @@ watch(selectedTimeId, (newVal) => {
         <div class="form-group checkbox-group">
           <label class="checkbox-label">
             <input type="checkbox" v-model="agreement">
-            <span>Я согласен с обработкой персональных данных</span>
+            <span>Я согласен с <a href="#" class="link" @click.prevent="showAgreementModal = true"> обработкой персональных данных</a></span>
           </label>
         </div>
 
@@ -943,7 +945,6 @@ watch(selectedTimeId, (newVal) => {
       </div>
     </div>
 
-    <!-- Модальное окно акции -->
     <div v-if="showPromotionModal && currentPromotion" class="modal-overlay" @click.self="showPromotionModal = false">
       <div class="modal-content">
         <button class="close-button" @click="showPromotionModal = false">×</button>
@@ -971,6 +972,8 @@ watch(selectedTimeId, (newVal) => {
       </div>
     </div>
   </div>
+  <AgreementModal :showAgreementModal="showAgreementModal" @close="showAgreementModal = false"
+    @click.self="showAgreementModal = false" />
   <PrivacyPolicyModal :showPolicyModal="showPolicyModal" @close="showPolicyModal = false"
     @click.self="showPolicyModal = false" />
   <RulesModal :showRules="showRulesModal" @close="showRulesModal = false" @click.self="showRulesModal = false" />
