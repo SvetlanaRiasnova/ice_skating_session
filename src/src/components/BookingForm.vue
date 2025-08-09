@@ -35,6 +35,7 @@ interface SessionTime {
   end_time: string;
   available_places_count: number;
   available_penguin_count: number;
+  number: number
 }
 
 interface SessionDetails {
@@ -723,7 +724,7 @@ watch(selectedTimeId, (newVal) => {
         <template v-else-if="paymentStatus.success === null">
           <h2>Предварительный просмотр заказа</h2>
           <div v-if="sessionDetails && selectedTime" class="order-summary">
-            <div><strong>Сеанс №{{ selectedTime.id }}</strong></div>
+            <div><strong>Сеанс №{{ selectedTime.number }}</strong></div>
             <div>Дата: {{ formatDate(sessionDetails.date) }}</div>
             <div>Время: {{ selectedTime.start_time }} - {{ selectedTime.end_time }}</div>
             <div>Взрослые: {{ adults }}</div>
@@ -844,7 +845,7 @@ watch(selectedTimeId, (newVal) => {
       <template v-else>
         <!-- Основная форма -->
         <div v-if="sessionDetails && selectedTime" class="current-session">
-          <strong>Сеанс №{{ selectedTime.id }}</strong><br>
+          <strong>Сеанс №{{ selectedTime.number }}</strong><br>
           Дата и время: {{ formatDate(sessionDetails.date) }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
         </div>
 
