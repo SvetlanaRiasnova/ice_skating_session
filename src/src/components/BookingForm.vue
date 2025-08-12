@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
-import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions } from '../services/api';
+import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions, getUserData } from '../services/api';
 import AgreementModal from './AgreementModal.vue';
 import PrivacyPolicyModal from './PrivacyPolicyModal.vue';
 import RulesModal from './RulesModal.vue';
