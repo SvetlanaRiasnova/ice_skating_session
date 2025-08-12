@@ -69,4 +69,11 @@ export async function getPromotions() {
   });
 }
 
+export async function getUserData(payload: any) {
+  return fetchApi('api/v1/users/user_info/', {
+    method: 'POST',
+    body: payload
+  });
+}
+
 export { isApiError };

@@ -54,6 +54,11 @@ interface Promotion {
   image: string | null;
 }
 
+interface UserData {
+  full_name: string  | null;
+  phone: string  | null;
+}
+
 interface ApiError {
   response?: {
     status?: number;
@@ -127,7 +132,7 @@ const showAgreementModal = ref(false);
 const showPolicyModal = ref(false);
 const showRulesModal = ref(false);
 const ticketsExceeded = ref(false);
-
+const userData = ref<UserData | null>(null);
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -295,6 +300,9 @@ async function loadSessions() {
   try {
     sessions.value = await getSessions(filterType.value, customDate.value);
     await fetchPromotions();
+    await fetchUserData();
+    userName.value = userData.value?.full_name || ''
+    phoneNumber.value = formatPhoneNumber(userData.value?.phone || '')
   } catch (error) {
     console.error('Ошибка загрузки сеансов:', error);
     errorMessage.value = 'Не удалось загрузить сеансы. Попробуйте позже.';
@@ -323,6 +331,17 @@ const fetchPromotions = async () => {
     promotions.value = await getPromotions();
   } catch (error) {
     console.error('Ошибка загрузки акций:', error);
+  }
+};
+
+const fetchUserData = async () => {
+  try {
+    const payload: Record<string, any> = {
+      ...(isTelegram.value && initData.value && { InitData: initData.value })
+    };
+    userData.value = await getUserData(payload);
+  } catch (error) {
+    console.error('Ошибка загрузки данных пользователя:', error);
   }
 };
 
