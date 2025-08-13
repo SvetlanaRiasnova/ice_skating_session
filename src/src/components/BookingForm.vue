@@ -57,6 +57,7 @@ interface Promotion {
 interface UserData {
   full_name: string  | null;
   phone: string  | null;
+  email: string | null;
 }
 
 interface ApiError {
@@ -133,6 +134,9 @@ const showPolicyModal = ref(false);
 const showRulesModal = ref(false);
 const ticketsExceeded = ref(false);
 const userData = ref<UserData | null>(null);
+const sendCheck = ref(true)
+const userEmail = ref('');
+const emailError = ref('')
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -268,6 +272,24 @@ const validateName = (name: string): boolean => {
   return true;
 };
 
+
+const validateEmail = (email: string): boolean => {
+  if (sendCheck.value) {
+    if (!/^(|([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))$/.test(email)) {
+      emailError.value = 'Введите правильный адрес электронной почты';
+      return false;
+    }
+
+    if (!email.trim()) {
+      emailError.value = 'Введите адрес электронной почты';
+      return false;
+    }
+  }
+
+  emailError.value = '';
+  return true;
+};
+
 const handlePhoneInput = (event: Event) => {
   const input = event.target as HTMLInputElement;
   let value = input.value.replace(/\D/g, '');
@@ -303,6 +325,7 @@ async function loadSessions() {
     await fetchUserData();
     userName.value = userData.value?.full_name || ''
     phoneNumber.value = formatPhoneNumber(userData.value?.phone || '')
+    userEmail.value = userData.value?.email || ''
   } catch (error) {
     console.error('Ошибка загрузки сеансов:', error);
     errorMessage.value = 'Не удалось загрузить сеансы. Попробуйте позже.';
@@ -579,6 +602,10 @@ const handleCancel = () => {
 const completeOrder = async () => {
   if (!sessionId.value || !selectedTimeId.value) return;
 
+  if (sendCheck.value && !validateEmail(userEmail.value)) {
+    return;
+  }
+
   try {
     paymentStatus.value = { loading: true, success: null, order: null };
     errorMessage.value = '';
@@ -594,6 +621,8 @@ const completeOrder = async () => {
       user_phone: normalizePhoneNumber(phoneNumber.value),
       promo_code: promoCodeApplied.value ? promoCode.value : null,
       promotions: selectedPromotions.value.length > 0 ? selectedPromotions.value : [],
+      send_check: sendCheck.value,
+      user_email: userEmail.value,
       ...(isTelegram.value && initData.value && { InitData: initData.value })
     };
 
@@ -802,6 +831,19 @@ watch(selectedTimeId, (newVal) => {
 
             <div class="total-cost">
               <strong>Итого <span class="total-cost__descr">(с учетом акций и скидок)</span>: {{ totalCost }} ₽</strong>
+            </div>
+          </div>
+
+          <div>
+            <div class="form-group checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" v-model="sendCheck">
+                    <span>Отправить чек на email</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <input type="text" v-model="userEmail" @blur="validateEmail(userEmail)">
+              <div class="error-message" v-if="emailError">{{ emailError }}</div>
             </div>
           </div>
 
