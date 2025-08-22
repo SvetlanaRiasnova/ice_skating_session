@@ -287,7 +287,7 @@ const validateEmail = (email: string): boolean => {
       return false;
     }
   }
-
+ 
   emailError.value = '';
   return true;
 };
