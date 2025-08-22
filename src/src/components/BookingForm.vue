@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch, onMounted } from 'vue';
-import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions } from '../services/api';
+import { getSessionDetails, getOrderPrice, createOrder, getSessions, checkOrderStatus, checkPromoCode, getPromotions, getUserData } from '../services/api';
 import AgreementModal from './AgreementModal.vue';
 import PrivacyPolicyModal from './PrivacyPolicyModal.vue';
 import RulesModal from './RulesModal.vue';
@@ -52,6 +52,12 @@ interface Promotion {
   end_date: string;
   sum: number;
   image: string | null;
+}
+
+interface UserData {
+  full_name: string  | null;
+  phone: string  | null;
+  email: string | null;
 }
 
 interface ApiError {
@@ -127,7 +133,10 @@ const showAgreementModal = ref(false);
 const showPolicyModal = ref(false);
 const showRulesModal = ref(false);
 const ticketsExceeded = ref(false);
-
+const userData = ref<UserData | null>(null);
+const sendCheck = ref(true)
+const userEmail = ref('');
+const emailError = ref('')
 
 const checkTelegramWebApp = (): boolean => {
   try {
@@ -263,6 +272,24 @@ const validateName = (name: string): boolean => {
   return true;
 };
 
+
+const validateEmail = (email: string): boolean => {
+  if (sendCheck.value) {
+    if (!/^(|([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))$/.test(email)) {
+      emailError.value = 'Введите правильный адрес электронной почты';
+      return false;
+    }
+
+    if (!email.trim()) {
+      emailError.value = 'Введите адрес электронной почты';
+      return false;
+    }
+  }
+
+  emailError.value = '';
+  return true;
+};
+
 const handlePhoneInput = (event: Event) => {
   const input = event.target as HTMLInputElement;
   let value = input.value.replace(/\D/g, '');
@@ -295,6 +322,10 @@ async function loadSessions() {
   try {
     sessions.value = await getSessions(filterType.value, customDate.value);
     await fetchPromotions();
+    await fetchUserData();
+    userName.value = userData.value?.full_name || ''
+    phoneNumber.value = formatPhoneNumber(userData.value?.phone || '')
+    userEmail.value = userData.value?.email || ''
   } catch (error) {
     console.error('Ошибка загрузки сеансов:', error);
     errorMessage.value = 'Не удалось загрузить сеансы. Попробуйте позже.';
@@ -323,6 +354,17 @@ const fetchPromotions = async () => {
     promotions.value = await getPromotions();
   } catch (error) {
     console.error('Ошибка загрузки акций:', error);
+  }
+};
+
+const fetchUserData = async () => {
+  try {
+    const payload: Record<string, any> = {
+      ...(isTelegram.value && initData.value && { InitData: initData.value })
+    };
+    userData.value = await getUserData(payload);
+  } catch (error) {
+    console.error('Ошибка загрузки данных пользователя:', error);
   }
 };
 
@@ -560,6 +602,10 @@ const handleCancel = () => {
 const completeOrder = async () => {
   if (!sessionId.value || !selectedTimeId.value) return;
 
+  if (sendCheck.value && !validateEmail(userEmail.value)) {
+    return;
+  }
+
   try {
     paymentStatus.value = { loading: true, success: null, order: null };
     errorMessage.value = '';
@@ -575,6 +621,8 @@ const completeOrder = async () => {
       user_phone: normalizePhoneNumber(phoneNumber.value),
       promo_code: promoCodeApplied.value ? promoCode.value : null,
       promotions: selectedPromotions.value.length > 0 ? selectedPromotions.value : [],
+      send_check: sendCheck.value,
+      user_email: userEmail.value,
       ...(isTelegram.value && initData.value && { InitData: initData.value })
     };
 
@@ -786,6 +834,19 @@ watch(selectedTimeId, (newVal) => {
             </div>
           </div>
 
+          <div>
+            <div class="form-group checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" v-model="sendCheck">
+                    <span>Отправить чек на email</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <input type="text" v-model="userEmail" @blur="validateEmail(userEmail)">
+              <div class="error-message" v-if="emailError">{{ emailError }}</div>
+            </div>
+          </div>
+
           <div class="payment-rules">
             <h3>ВНИМАНИЕ! Прочтите до конца!</h3>
             <ol>
@@ -793,7 +854,7 @@ watch(selectedTimeId, (newVal) => {
                     посещения Ледовой арены IceMETP</strong></a></li>
               <li>Оплачивая заказ Вы соглашаетесь с правилами посещения Ледовой арены IceMETP.</li>
               <li>На оплату заказа Вам дается 10 минут, иначе заказ будет отменен.</li>
-              <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать ПИН-КОД, по которому
+              <li>После оплаты в чат бот Вам придет информация о покупке, которая будет содержать <strong>ПИН-КОД</strong>, по которому
                 Вы получите пропуск на арену.</li>
               <li>Внимательно проверьте состав заказа, дату и время сеанса, так как билеты являются НЕВОЗВРАТНЫМИ!</li>
               <li>Нажимая кнопку "Перейти к оплате", Вы подтверждаете, что ознакомились с правилами и согласны с ними.
