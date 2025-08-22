@@ -739,7 +739,7 @@ watch(selectedTimeId, (newVal) => {
         <ul v-if="sessions.length > 0" class="session-list">
           <li v-for="session in sessions" :key="session.id" @click="getDateTimes(session)" class="session-item"
             :class="{ 'selected': sessionId === session.id }">
-            {{session.day_of_week }}, {{ formatDate(session.date) }}
+            {{ formatDate(session.date) }} , {{session.day_of_week }}
 
             <ul v-if="sessionId === session.id && selectedTimes.length" class="time-list">
               <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id" class="time-item"
@@ -779,7 +779,7 @@ watch(selectedTimeId, (newVal) => {
           <h2>Предварительный просмотр заказа</h2>
           <div v-if="sessionDetails && selectedTime" class="order-summary">
             <div><strong>Сеанс №{{ selectedTime.number }}</strong></div>
-            <div>Дата: {{ formatDate(sessionDetails.date) }} ({{sessionDetails.day_of_week}})</div>
+            <div>Дата: {{ formatDate(sessionDetails.date) }}, {{sessionDetails.day_of_week}}</div>
             <div>Время: {{ selectedTime.start_time }} - {{ selectedTime.end_time }}</div>
             <div>Взрослые: {{ adults }}</div>
             <div>Дети: {{ children }}</div>
@@ -886,7 +886,7 @@ watch(selectedTimeId, (newVal) => {
             <div><strong>Номер заказа:</strong> {{ paymentStatus.order.id }}</div>
             <div><strong>Номер платежа:</strong> {{ paymentStatus.order.payment_id }}</div>
             <div><strong>Пин-код:</strong> {{ paymentStatus.order.pin }}</div>
-            <div><strong>Дата:</strong> {{ formatDate(paymentStatus.order.date) }} ({{ paymentStatus.order.day_of_week }})</div>
+            <div><strong>Дата:</strong> {{ formatDate(paymentStatus.order.date) }}, {{ paymentStatus.order.day_of_week }}</div>
             <div><strong>Время:</strong> {{ paymentStatus.order.time }}</div>
             <div><strong>Количество человек:</strong> {{ paymentStatus.order.people_count }}</div>
             <div><strong>Стоимость:</strong> {{ paymentStatus.order.price }} ₽</div>
@@ -913,7 +913,9 @@ watch(selectedTimeId, (newVal) => {
         <!-- Основная форма -->
         <div v-if="sessionDetails && selectedTime" class="current-session">
           <strong>Сеанс №{{ selectedTime.number }}</strong><br>
-          Дата и время: {{ formatDate(sessionDetails.date) }} {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
+          <p>Дата: {{ formatDate(sessionDetails.date) }}, {{ sessionDetails.day_of_week }}</p>
+          <p>Время:  {{ selectedTime.start_time }}-{{ selectedTime.end_time }}</p>
+          
         </div>
 
         <div class="form-group" :class="{ 'has-error': ticketsExceeded }">
