@@ -770,9 +770,9 @@ watch(selectedTimeId, (newVal) => {
       <template v-if="isReviewMode">
         <!-- Блок подтверждения заказа -->
         <div v-if="paymentStatus.loading" class="payment-loading">
-          <h2>Проверка оплаты...</h2>
+          <h2>Ожидание оплаты...</h2>
           <div class="spinner"></div>
-          <p>Пожалуйста, подождите, пока мы проверяем статус вашего платежа</p>
+          <p>Пожалуйста, подождите, пока мы проверяем статус вашего платежа. Если Вы передумали оплачивать текущий заказ, обновите страницу и создайте заказ заново.</p>
         </div>
 
         <template v-else-if="paymentStatus.success === null">
