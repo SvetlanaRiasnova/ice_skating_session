@@ -338,9 +338,7 @@ async function loadSessions() {
     sessions.value = await getSessions(filterType.value, customDate.value);
     await fetchPromotions();
     // await fetchUserData();
-    userName.value = userData.value?.full_name || ''
-    phoneNumber.value = formatPhoneNumber(userData.value?.phone || '')
-    userEmail.value = userData.value?.email || ''
+    
   } catch (error) {
     console.error('Ошибка загрузки сеансов:', error);
     errorMessage.value = 'Не удалось загрузить сеансы. Попробуйте позже.';
@@ -379,6 +377,9 @@ const fetchUserData = async () => {
       ...(isTelegram.value && initData.value && { InitData: initData.value })
     };
     userData.value = await getUserData(payload);
+    userName.value = userData.value?.full_name || ''
+    phoneNumber.value = formatPhoneNumber(userData.value?.phone || '')
+    userEmail.value = userData.value?.email || ''
     noUserData.value = false
   } catch (error) {
     noUserData.value = true
