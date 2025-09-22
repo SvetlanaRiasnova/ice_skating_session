@@ -172,7 +172,7 @@ const initTelegramWebApp = async () => {
       }
 
       initData.value = tgWebApp.value.initData || '';
-      console.log('Telegram WebApp успешно инициализирован');
+      
     }
   } catch (error) {
     console.error('Ошибка инициализации Telegram WebApp:', error);
@@ -183,9 +183,6 @@ const closeWebApp = () => {
   if (isTelegram.value && tgWebApp.value) {
     tgWebApp.value.close()
   }
-  // else {
-  //   console.log('tg closed')
-  // }
   
 }
 
@@ -1102,21 +1099,6 @@ watch(selectedTimeId, (newVal) => {
   justify-content: center;
   padding: 40px;
   text-align: center;
-}
-
-.loading-container .spinner {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 20px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #064594;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 .booking-container.no-user {
