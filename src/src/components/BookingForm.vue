@@ -88,6 +88,8 @@ const paymentStatus = ref({
   order: null as any
 });
 
+const isLoadingUser = ref(true);
+const noUserData = ref(false);
 const sessions = ref<Session[]>([]);
 const filterType = ref<FilterType>('');
 const customDate = ref('');
@@ -177,13 +179,24 @@ const initTelegramWebApp = async () => {
   }
 };
 
+const closeWebApp = () => {
+  if (isTelegram.value && tgWebApp.value) {
+    tgWebApp.value.close()
+  }
+  // else {
+  //   console.log('tg closed')
+  // }
+  
+}
+
 onMounted(async () => {
+  
   isTelegram.value = checkTelegramWebApp();
 
   if (isTelegram.value) {
     await initTelegramWebApp();
   }
-
+  await fetchUserData();
   const urlParams = new URLSearchParams(window.location.search);
   const paymentUuid = urlParams.get('uuid');
 
@@ -324,7 +337,7 @@ async function loadSessions() {
   try {
     sessions.value = await getSessions(filterType.value, customDate.value);
     await fetchPromotions();
-    await fetchUserData();
+    // await fetchUserData();
     userName.value = userData.value?.full_name || ''
     phoneNumber.value = formatPhoneNumber(userData.value?.phone || '')
     userEmail.value = userData.value?.email || ''
@@ -361,12 +374,18 @@ const fetchPromotions = async () => {
 
 const fetchUserData = async () => {
   try {
+    isLoadingUser.value = true
     const payload: Record<string, any> = {
       ...(isTelegram.value && initData.value && { InitData: initData.value })
     };
     userData.value = await getUserData(payload);
+    noUserData.value = false
   } catch (error) {
+    noUserData.value = true
     console.error('Ошибка загрузки данных пользователя:', error);
+  }
+  finally {
+    isLoadingUser.value = false
   }
 };
 
@@ -718,7 +737,16 @@ watch(selectedTimeId, (newVal) => {
 </script>
 
 <template>
-  <div class="booking-container" :class="{ 'telegram': isTelegram }">
+  <div class="booking-container">
+  <div v-if="isLoadingUser" class="loading-container">
+      <div class="spinner"></div>
+  </div>
+  <div class="no-user"  v-else-if="noUserData">
+    <p>Вы не приняли согласие на обработку персональных данных, с правилами посещения Ледовой Арены и политикой конфиденциальности в боте. <br>
+Примите согласие и повторите снова</p>
+<button @click="closeWebApp" class="primary return-button">Вернуться в бота</button>
+  </div>
+  <div v-else class="booking-container" :class="{ 'telegram': isTelegram }">
     <!-- Блок фильтрации сеансов -->
     <div class="filter-container" v-if="!isReviewMode">
       <select v-model="filterType" class="filter-select">
@@ -1047,9 +1075,10 @@ watch(selectedTimeId, (newVal) => {
   <PrivacyPolicyModal :showPolicyModal="showPolicyModal" @close="showPolicyModal = false"
     @click.self="showPolicyModal = false" />
   <RulesModal :showRules="showRulesModal" @close="showRulesModal = false" @click.self="showRulesModal = false" />
+   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&subset=latin,cyrillic');
 
 .booking-container {
@@ -1063,6 +1092,60 @@ watch(selectedTimeId, (newVal) => {
 .booking-container.telegram {
   max-width: 100%;
   padding: 10px;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.loading-container .spinner {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 20px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #064594;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.booking-container.no-user {
+  padding: 20px;
+  text-align: center;
+  background-color: #f5f9ff;
+  border: 1px solid #d0e0ff;
+  border-radius: 8px;
+  margin: 20px;
+}
+
+.booking-container.no-user p {
+  margin: 0;
+  color: #064594;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.return-button {
+  margin-top: 10px;
+  background-color: #064594;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.return-button:hover {
+  background-color: #043a7a;
 }
 
 /* Стили фильтра */
@@ -1169,8 +1252,7 @@ watch(selectedTimeId, (newVal) => {
   color: #064594;
 }
 
-/* Стили формы */
-.booking-form {
+.booking-form, .no-user {
   background-color: #f5f9ff;
   border: 1px solid #d0e0ff;
   border-radius: 8px;
