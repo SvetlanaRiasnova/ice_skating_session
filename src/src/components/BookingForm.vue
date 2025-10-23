@@ -36,7 +36,8 @@ interface SessionTime {
   end_time: string;
   available_places_count: number;
   available_penguin_count: number;
-  number: number
+  number: number;
+  custom_price: boolean
 }
 
 interface SessionDetails {
@@ -739,7 +740,7 @@ watch(selectedTimeId, (newVal) => {
   <div v-if="isLoadingUser" class="loading-container">
       <div class="spinner"></div>
   </div>
-  <div class="no-user"  v-else-if="noUserData">
+  <div class="no-user"  v-else-if="!noUserData">
     <p>Вы не приняли согласие на обработку персональных данных, с правилами посещения Ледовой Арены и политикой конфиденциальности в боте. <br>
 Примите согласие и повторите снова</p>
 <button @click="closeWebApp" class="primary return-button">Вернуться в бота</button>
@@ -771,7 +772,9 @@ watch(selectedTimeId, (newVal) => {
               <li v-for="time in selectedTimes" :key="time.id" @click.stop="selectedTimeId = time.id" class="time-item"
                 :class="{
                   'selected-time': selectedTimeId === time.id,
-                }">
+                  'custom-price': time.custom_price
+                }"
+                >
                 {{ time.start_time }} - {{ time.end_time }}
                 <div class="availability" :class="{ 'selected': selectedTimeId === time.id }">
                   <p>Мест: {{ time.available_places_count }}</p>
@@ -941,6 +944,7 @@ watch(selectedTimeId, (newVal) => {
           <strong>Сеанс №{{ selectedTime.number }}</strong><br>
           <p>Дата: {{ formatDate(sessionDetails.date) }}, {{ sessionDetails.day_of_week }}</p>
           <p>Время:  {{ selectedTime.start_time }}-{{ selectedTime.end_time }}</p>
+          <p v-if="selectedTime.custom_price">ВЫБРАН СЕАНС ПО СПЕЦЦЕНЕ</p>
           
         </div>
 
@@ -1213,6 +1217,13 @@ watch(selectedTimeId, (newVal) => {
 
 }
 
+.time-item.custom-price {
+  background-color: #40E0D0;
+  color: #064594;
+  & .availability {
+    color: #064594;
+  }
+}
 .time-item.selected-time {
   background-color: white;
   color: #064594;
