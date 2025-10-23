@@ -7,9 +7,7 @@ export async function fetchApi(
   } = {}
 ) {
 
-  // const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
-  const baseUrl = "https://x0vczx-212-19-10-25.ru.tuna.am";
-
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
  
   let url = `${baseUrl}/${endpoint}`.replace(/([^:]\/)\/+/g, '$1');
  
