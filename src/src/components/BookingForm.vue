@@ -944,7 +944,7 @@ watch(selectedTimeId, (newVal) => {
           <strong>Сеанс №{{ selectedTime.number }}</strong><br>
           <p>Дата: {{ formatDate(sessionDetails.date) }}, {{ sessionDetails.day_of_week }}</p>
           <p>Время:  {{ selectedTime.start_time }}-{{ selectedTime.end_time }}</p>
-          <p v-if="selectedTime.custom_price">ВЫБРАН СЕАНС ПО СПЕЦЦЕНЕ</p>
+          <p v-if="selectedTime.custom_price"><strong>Выбран сеанс по спеццене</strong></p>
           
         </div>
 
