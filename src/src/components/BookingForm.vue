@@ -740,7 +740,7 @@ watch(selectedTimeId, (newVal) => {
   <div v-if="isLoadingUser" class="loading-container">
       <div class="spinner"></div>
   </div>
-  <div class="no-user"  v-else-if="!noUserData">
+  <div class="no-user"  v-else-if="noUserData">
     <p>Вы не приняли согласие на обработку персональных данных, с правилами посещения Ледовой Арены и политикой конфиденциальности в боте. <br>
 Примите согласие и повторите снова</p>
 <button @click="closeWebApp" class="primary return-button">Вернуться в бота</button>
