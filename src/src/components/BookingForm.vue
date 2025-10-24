@@ -1104,7 +1104,7 @@ watch(selectedTimeId, (newVal) => {
               Время: {{ selectedTime.start_time }}-{{ selectedTime.end_time }}
             </p>
             <p v-if="selectedTime.custom_price">
-              <strong>Выбран сеанс по спеццене</strong>
+              <strong>ВЫБРАН СЕАНС ПО СПЕЦЦЕНЕ</strong>
             </p>
           </div>
 
